@@ -210,6 +210,9 @@ func (a *app) printVerses(res verseResult, ranges []bible.Range) {
 		}
 		for _, n := range v.Notes {
 			notes = append(notes, fmt.Sprintf("  %s %s", n.Label, n.Text))
+			for _, d := range n.Defines {
+				notes = append(notes, fmt.Sprintf("      %s → %s", d.Term, d.URL))
+			}
 		}
 	}
 	section := func(title string, lines []string, empty string) {

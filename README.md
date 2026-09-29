@@ -163,6 +163,18 @@ What the library currently holds:
 pubkit pubs --json
 ```
 
+### `chain`
+
+Follow the marginal references out of a passage, as far as you ask, with each verse's text:
+
+```sh
+pubkit chain "Jer 38:6" --hops 2
+```
+
+The walk is breadth-first and visits a verse once, so each one is reported at the fewest
+references it is reachable by — and so the walk finishes, which a naive one does not: the
+references point both ways.
+
 ### `dossier`
 
 Everything around a passage — verses, notes, references and the articles that cite it — in one

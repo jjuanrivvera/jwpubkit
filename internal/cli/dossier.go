@@ -60,9 +60,16 @@ type imageOut struct {
 	Height  int    `json:"height"`
 }
 
-// placeOut is a proper-noun candidate found in the chapter's study notes
-// and footnotes, cross-referenced against Perspicacia (it) by exact title.
-type placeOut struct {
+// termOut is a capitalised word found in the chapter's study notes and
+// footnotes that has an article of its own in the encyclopedia.
+//
+// It is NOT a list of places, and used to be labelled as one. Measured on one
+// chapter: of seven candidates three were the names of publications picked out
+// of citations, and seven real places in the same notes were missed. Nothing in
+// any publication marks an article as being about a place — an article on a
+// city and an article on an abstract noun carry the same class — so a feature
+// that claimed places would be claiming something it cannot know.
+type termOut struct {
 	Name    string `json:"name"`
 	ItDocID int    `json:"it_docid,omitempty"`
 	InIt    bool   `json:"in_it"`
@@ -76,12 +83,12 @@ type chapterDossier struct {
 	Verses      []store.Verse `json:"verses"`
 	Citations   []citationOut `json:"citations"`
 	Images      []imageOut    `json:"images"`
-	Places      []placeOut    `json:"places"`
+	Terms       []termOut     `json:"terms"`
 	NotInLib    []string      `json:"not_in_library"`
 	VerseCount  int           `json:"verse_count"`
 	CiteCount   int           `json:"citation_count"`
 	ImageCount  int           `json:"image_count"`
-	PlaceCount  int           `json:"place_count"`
+	TermCount   int           `json:"term_count"`
 	TokenEst    int           `json:"estimated_tokens"`
 	ExtractsCut bool          `json:"extracts_trimmed,omitempty"`
 	File        string        `json:"file,omitempty"`
@@ -149,7 +156,7 @@ citations are never dropped.`,
 			}
 			hasIt := st.HasSymbol("it")
 			if !hasIt {
-				a.logf("the encyclopedic publication (it) is not in the library; the place cross-reference is skipped")
+				a.logf("the encyclopedic publication (it) is not in the library; the term lookup is skipped")
 			}
 			res := &dossierResult{Ref: bible.FormatList(chapters), OutDir: outDir}
 			for _, r := range chapters {
@@ -166,8 +173,8 @@ citations are never dropped.`,
 				}
 				d.File = path
 				res.Chapters = append(res.Chapters, d)
-				a.logf("%s · %d verses · %d citations · %d images · %d places · ~%d tokens → %s",
-					r.Long(), d.VerseCount, d.CiteCount, d.ImageCount, d.PlaceCount, d.TokenEst, path)
+				a.logf("%s · %d verses · %d citations · %d images · %d terms · ~%d tokens → %s",
+					r.Long(), d.VerseCount, d.CiteCount, d.ImageCount, d.TermCount, d.TokenEst, path)
 			}
 			jsonPath := filepath.Join(outDir, "dossier.json")
 			jf, err := os.Create(jsonPath)
@@ -189,8 +196,8 @@ citations are never dropped.`,
 			}
 			a.printf("Dossier for %s · %d chapters · directory %s\n", res.Ref, len(res.Chapters), outDir)
 			for _, d := range res.Chapters {
-				a.printf("  %s · %d verses · %d citations · %d images · %d places · ~%d tokens · %s\n",
-					d.Ref, d.VerseCount, d.CiteCount, d.ImageCount, d.PlaceCount, d.TokenEst, filepath.Base(d.File))
+				a.printf("  %s · %d verses · %d citations · %d images · %d terms · ~%d tokens · %s\n",
+					d.Ref, d.VerseCount, d.CiteCount, d.ImageCount, d.TermCount, d.TokenEst, filepath.Base(d.File))
 			}
 			a.printf("  %s\n", jsonPath)
 			return nil
@@ -285,11 +292,11 @@ func (a *app) buildChapterDossier(st *store.Store, r bible.Range, hasIt bool) (*
 	d.NotInLib = append(d.NotInLib, missingImg...)
 
 	if hasIt {
-		d.Places = a.chapterPlaces(st, verses)
+		d.Terms = a.chapterTerms(st, verses)
 	} else {
-		d.NotInLib = append(d.NotInLib, "the encyclopedic publication (it) is not synced: the places were not cross-referenced")
+		d.NotInLib = append(d.NotInLib, "the encyclopedic publication (it) is not synced: the terms were not looked up")
 	}
-	d.PlaceCount = len(d.Places)
+	d.TermCount = len(d.Terms)
 
 	for _, v := range verses {
 		for _, n := range v.Notes {
@@ -396,7 +403,11 @@ func (a *app) chapterImages(st *store.Store, cites []citationOut) ([]imageOut, [
 		}
 		n := 0
 		for _, m := range media {
-			if m.Width == 0 || m.Height == 0 || !strings.HasPrefix(m.Mime, "image") {
+			// A vector figure records no width or height — the maps and diagrams of
+			// a study Bible's appendices are SVG and every one of them was being
+			// dropped here as if it had no image at all. Size is a way to skip a
+			// decorative raster strip, not a test for whether a picture exists.
+			if !strings.HasPrefix(m.Mime, "image") || (!isVector(m.Mime) && (m.Width == 0 || m.Height == 0)) {
 				continue
 			}
 			n++
@@ -434,14 +445,14 @@ func init() {
 	}
 }
 
-// chapterPlaces is a best-effort, purely local heuristic (documented in the
+// chapterTerms is a best-effort, purely local heuristic (documented in the
 // command help): it does not attempt real place/person NLP classification.
 // It pulls capitalized-word candidates out of the chapter's study notes and
 // footnotes (skipping each segment's first word, almost always a sentence
 // start rather than a proper noun) and cross-references them against
 // Perspicacia (it) by exact document title, which is the closest thing this
 // library has to a place/term dictionary.
-func (a *app) chapterPlaces(st *store.Store, verses []store.Verse) []placeOut {
+func (a *app) chapterTerms(st *store.Store, verses []store.Verse) []termOut {
 	var texts []string
 	for _, v := range verses {
 		for _, n := range v.Notes {
@@ -451,10 +462,10 @@ func (a *app) chapterPlaces(st *store.Store, verses []store.Verse) []placeOut {
 			texts = append(texts, f.Text)
 		}
 	}
-	names := extractPlaceCandidates(texts)
-	out := make([]placeOut, 0, len(names))
+	names := extractTermCandidates(texts)
+	out := make([]termOut, 0, len(names))
 	for _, name := range names {
-		p := placeOut{Name: name}
+		p := termOut{Name: name}
 		if d, err := st.DocByTitle("it", name); err == nil && d != nil {
 			p.InIt, p.ItDocID = true, d.DocID
 		}
@@ -463,9 +474,9 @@ func (a *app) chapterPlaces(st *store.Store, verses []store.Verse) []placeOut {
 	return out
 }
 
-// extractPlaceCandidates is the pure part of chapterPlaces, kept separate so
+// extractTermCandidates is the pure part of chapterTerms, kept separate so
 // the heuristic can be unit tested without a database.
-func extractPlaceCandidates(texts []string) []string {
+func extractTermCandidates(texts []string) []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, text := range texts {
@@ -539,7 +550,7 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 	fmt.Fprintf(&b, "- Verses: %d\n", d.VerseCount)
 	fmt.Fprintf(&b, "- Citations found: %d\n", d.CiteCount)
 	fmt.Fprintf(&b, "- Images found: %d\n", d.ImageCount)
-	fmt.Fprintf(&b, "- Candidate places: %d\n", d.PlaceCount)
+	fmt.Fprintf(&b, "- Terms with an article: %d\n", d.TermCount)
 	if d.ExtractsCut {
 		b.WriteString("- Citation extracts trimmed to fit the token budget\n")
 	}
@@ -630,12 +641,12 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n## Places mentioned (candidates)\n\n")
-	b.WriteString("A local heuristic: proper nouns from the study notes and footnotes, cross-referenced by exact title against the encyclopedic publication (it). It is not real geographic classification, so check them.\n\n")
-	if len(d.Places) == 0 {
+	b.WriteString("\n## Terms with an article of their own\n\n")
+	b.WriteString("A heuristic: capitalised words from the study notes and footnotes that have an article of their own in the encyclopedia. It over-fires on publication names and misses names it does not capitalise, and nothing in the publications marks an article as being about a place — so this is a reading aid, not a classification.\n\n")
+	if len(d.Terms) == 0 {
 		b.WriteString("(none)\n")
 	}
-	for _, p := range d.Places {
+	for _, p := range d.Terms {
 		if p.InIt {
 			fmt.Fprintf(&b, "- %s → it docid %d\n", p.Name, p.ItDocID)
 		} else {
@@ -644,4 +655,10 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 	}
 
 	return b.String()
+}
+
+// isVector reports whether a media type is a drawing rather than a bitmap, and
+// therefore has no meaningful pixel size.
+func isVector(mime string) bool {
+	return strings.Contains(mime, "svg")
 }

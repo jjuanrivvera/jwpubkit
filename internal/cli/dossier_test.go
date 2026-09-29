@@ -48,10 +48,10 @@ func TestExtractPlaceCandidates(t *testing.T) {
 		"Aunque Dios ayudó a Ébed-Mélec, nadie más actuó.",
 		"El personaje visitó la ciudad de prueba otra vez.",
 	}
-	got := extractPlaceCandidates(texts)
+	got := extractTermCandidates(texts)
 	want := []string{"Jeremías", "Jerusalén", "Ébed-Mélec"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Fatalf("extractPlaceCandidates = %v, want %v", got, want)
+		t.Fatalf("extractTermCandidates = %v, want %v", got, want)
 	}
 }
 
@@ -162,11 +162,11 @@ func TestBuildChapterDossier(t *testing.T) {
 		t.Fatalf("Images = %+v", d.Images)
 	}
 
-	// Places: "Jerusalén" appears in both the note and the footnote (dedup)
+	// Terms: "Jerusalén" appears in both the note and the footnote (dedup)
 	// and matches the it entry; the stopword-filtered/position-0 words must
 	// not appear.
 	foundJerusalen := false
-	for _, p := range d.Places {
+	for _, p := range d.Terms {
 		if p.Name == "Jerusalén" {
 			foundJerusalen = true
 			if !p.InIt || p.ItDocID != 1200000500 {
@@ -175,7 +175,7 @@ func TestBuildChapterDossier(t *testing.T) {
 		}
 	}
 	if !foundJerusalen {
-		t.Fatalf("Jerusalén missing from places: %+v", d.Places)
+		t.Fatalf("Jerusalén missing from terms: %+v", d.Terms)
 	}
 
 	// "Not in library": the study note's docid 9999999 is not synced.
@@ -219,8 +219,8 @@ func TestBuildChapterDossierNoItSynced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(d.Places) != 0 {
-		t.Fatalf("places must stay empty when it is not synced: %+v", d.Places)
+	if len(d.Terms) != 0 {
+		t.Fatalf("terms must stay empty when it is not synced: %+v", d.Terms)
 	}
 	found := false
 	for _, m := range d.NotInLib {
@@ -273,7 +273,7 @@ func TestRenderChapterDossierNeverDropsVersesOrCitations(t *testing.T) {
 
 func TestChapterDossierJSONShape(t *testing.T) {
 	d := &chapterDossier{
-		Ref: "Jeremías 38", VerseCount: 1, CiteCount: 1, ImageCount: 0, PlaceCount: 0,
+		Ref: "Jeremías 38", VerseCount: 1, CiteCount: 1, ImageCount: 0, TermCount: 0,
 		Citations: []citationOut{{DocID: 1, Pub: "w24", Title: "T", Verses: []int{6}, Extract: "x"}},
 		NotInLib:  []string{"algo no está"},
 	}

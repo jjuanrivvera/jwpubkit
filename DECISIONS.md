@@ -53,6 +53,31 @@ make a choice stick.
 The lesson for testing, too: the verification that missed this ran `export JWPUBKIT_LANG=S`
 in the same command as the check, which guaranteed the result it was supposed to be testing.
 
+## The dossier's term list is not a place list, and no longer says it is
+
+It was labelled "places". Measured on one chapter: of seven candidates, three were the names
+of publications picked out of citations, and seven real places in the same notes were missed.
+Nothing in any publication marks an article as being about a place — an article on a city and
+an article on an abstract noun carry the same class and type — so the label was a claim the
+data cannot support. It is now "terms with an article of their own", which is what the
+heuristic actually finds, with its own limitations stated in the output.
+
+The lookup itself should move to the encyclopedia's own topic table (6 444 alias-aware entries,
+present in every language it is published in) rather than exact title matching. That is a
+separate, additive piece of work.
+
+## Study notes point at a dictionary by document id, so the pointer is followed, not read
+
+A note that says "see Glossary, X" expresses it as `<a class="xt" href="jwpub://p/<LANG>:<id>/">`.
+The class name and the scheme are untranslated and the id is the same in every language, so the
+reference is resolved by following the link. The entries themselves are published online rather
+than inside any JWPUB, so what is given is the identifier and the address — correct everywhere —
+rather than a definition the library does not hold.
+
+Matching the term text against another publication's glossary would cover about half of them,
+and a miss would be indistinguishable from "no such term". Half an answer that cannot say it is
+half is worse than an address.
+
 ## Addresses use jw.org's finder, not a wol path
 
 Every link this tool printed was hardcoded to one language: `wol.jw.org/es/wol/d/r4/lp-s/…`.

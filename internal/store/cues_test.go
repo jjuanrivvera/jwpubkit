@@ -81,3 +81,42 @@ func TestPutCuesReplaces(t *testing.T) {
 		t.Error("HasCues should see the transcript")
 	}
 }
+
+// A study note that says "see Glossary, X" says it with a link carrying a
+// document id. Following the link is language-proof; matching the words is not.
+func TestDefinitionsComeFromLinksNotProse(t *testing.T) {
+	html := `<p>Una nota con una remisión (ver glosario, ` +
+		`<a class="xt" data-xtid="49" href="jwpub://p/S:1001077253/"><em>arrepentimiento</em></a>` +
+		`) y otra (<a class="xt" href="jwpub://p/S:1001077100/">fe</a>).</p>` +
+		`<a class="b" href="jwpub://b/NWTR/24:38:6-24:38:6">Jer 38:6</a>` +
+		`<a class="xt" href="jwpub://p/S:1001077253/">arrepentimiento</a>`
+
+	got := definitionsIn(html)
+	if len(got) != 2 {
+		t.Fatalf("definitions = %+v, want the two distinct entries", got)
+	}
+	if got[0].Term != "arrepentimiento" || got[0].DocID != 1001077253 {
+		t.Errorf("first = %+v", got[0])
+	}
+	if got[1].Term != "fe" || got[1].DocID != 1001077100 {
+		t.Errorf("second = %+v", got[1])
+	}
+	if got[0].URL == "" {
+		t.Error("a definition should be openable")
+	}
+	// A Bible link is not a dictionary entry, and a repeat is not a second one.
+	for _, d := range got {
+		if d.DocID == 0 {
+			t.Errorf("a link without a document id got through: %+v", d)
+		}
+	}
+
+	// The same shape in another language, where only the language token differs.
+	ja := `<a class="xt" href="jwpub://p/J:1001077253/">悔い改め</a>`
+	if got := definitionsIn(ja); len(got) != 1 || got[0].DocID != 1001077253 {
+		t.Errorf("a japanese note should resolve the same document: %+v", got)
+	}
+	if definitionsIn("") != nil {
+		t.Error("no html, no definitions")
+	}
+}

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -353,6 +355,17 @@ type StudyNote struct {
 	Label string `json:"label"`
 	Text  string `json:"text"`
 	DocID int    `json:"docid,omitempty"`
+	// Defines are the dictionary entries this note sends the reader to. A note
+	// that says "see Glossary, X" expresses it as a link carrying a document id,
+	// not as prose, so the pointer survives translation and can be followed.
+	Defines []Definition `json:"defines,omitempty"`
+}
+
+// Definition is a term a study note points at, with where to read it.
+type Definition struct {
+	Term  string `json:"term"`
+	DocID int    `json:"docid"`
+	URL   string `json:"url"`
 }
 
 // HasBible reports whether a Bible with verse text is synced.
@@ -439,7 +452,7 @@ func (s *Store) Verses(first, last int) ([]Verse, error) {
 	}
 	xrows.Close()
 
-	nrows, err := s.DB.Query(`SELECT verse_id, COALESCE(label,''), text, COALESCE(docid,0) FROM verse_note WHERE verse_id BETWEEN ? AND ? ORDER BY verse_id, seq`, first, last)
+	nrows, err := s.DB.Query(`SELECT verse_id, COALESCE(label,''), text, COALESCE(docid,0), COALESCE(html,'') FROM verse_note WHERE verse_id BETWEEN ? AND ? ORDER BY verse_id, seq`, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -447,9 +460,11 @@ func (s *Store) Verses(first, last int) ([]Verse, error) {
 	for nrows.Next() {
 		var id int
 		var n StudyNote
-		if err := nrows.Scan(&id, &n.Label, &n.Text, &n.DocID); err != nil {
+		var html string
+		if err := nrows.Scan(&id, &n.Label, &n.Text, &n.DocID, &html); err != nil {
 			return nil, err
 		}
+		n.Defines = definitionsIn(html)
 		if i, ok := idx[id]; ok {
 			out[i].Notes = append(out[i].Notes, n)
 		}
@@ -732,4 +747,34 @@ func (s *Store) PutVideo(key, lang, title string, duration float64, subtitles st
 	_, err := s.DB.Exec(`INSERT OR REPLACE INTO video(key, lang, title, duration, subtitles, json, fetched_at) VALUES(?,?,?,?,?,?,?)`,
 		key, lang, title, duration, subtitles, string(b), time.Now().Format(time.RFC3339))
 	return err
+}
+
+// dictLinkRe finds the links a study note uses to send the reader to a
+// dictionary entry: class="xt" with a publication link carrying a document id
+// and no paragraph. The class name and the jwpub scheme are untranslated, which
+// is why they can be matched while the words around them cannot.
+var dictLinkRe = regexp.MustCompile(`<a[^>]*class="xt"[^>]*href="jwpub://p/[A-Za-z]+:(\d+)/?"[^>]*>(.*?)</a>`)
+
+var tagRe = regexp.MustCompile(`<[^>]+>`)
+
+// definitionsIn pulls the dictionary entries a note points at. The entries
+// themselves are published online rather than inside any JWPUB, so what can be
+// given is the identifier and the address — which are correct in every
+// language — rather than a definition the library does not hold.
+func definitionsIn(html string) []Definition {
+	if html == "" {
+		return nil
+	}
+	var out []Definition
+	seen := map[int]bool{}
+	for _, m := range dictLinkRe.FindAllStringSubmatch(html, -1) {
+		docid, err := strconv.Atoi(m[1])
+		if err != nil || seen[docid] {
+			continue
+		}
+		seen[docid] = true
+		term := strings.TrimSpace(tagRe.ReplaceAllString(m[2], ""))
+		out = append(out, Definition{Term: term, DocID: docid, URL: content.DocURL(docid, 0)})
+	}
+	return out
 }
