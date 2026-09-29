@@ -2,7 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -67,15 +66,12 @@ publication, title, paragraph and snippet.`,
 				return nil
 			}
 			for _, h := range hits {
-				par := fmt.Sprintf("pid %d", h.PID)
-				if h.Num > 0 {
-					par += fmt.Sprintf(", par. %d", h.Num)
-				}
-				a.printf("%-11d %-7s %s (%s", h.DocID, h.Pub, h.Title, par)
+				a.printf("%-22s %s", h.Cite, h.Title)
 				if h.Matches > 1 {
-					a.printf(", %d paragraphs match", h.Matches)
+					a.printf(" (%d paragraphs match)", h.Matches)
 				}
-				a.printf(")\n            %s\n", h.Snippet)
+				a.printf("\n%-22s %s\n", "", h.Snippet)
+				a.printf("%-22s %s\n", "", h.URL)
 			}
 			if len(verses) > 0 {
 				a.printf("\nBible verses:\n")

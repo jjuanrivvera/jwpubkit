@@ -156,12 +156,12 @@ func TestMarkdown(t *testing.T) {
 		"> **1.** ¿Primera pregunta?",
 		"**1** PRIMER párrafo con nota[^a] y **(lee 1 Timoteo 2:3, 4).**",
 		"> **2, 3.** a) ¿Pregunta doble? (Santiago 5:11).",
-		"[*w13* 15/1 9 párr. 12](https://wol.jw.org/es/wol/d/r4/lp-s/2013043#p22)",
+		"[*w13* 15/1 9 párr. 12](https://www.jw.org/finder?docid=2013043&par=22)",
 		"![Descripción de la imagen.](2026999_univ_cnt_1.jpg)\n*Pie de la imagen.*",
 		"> ## ¿QUÉ RESPONDERÍAS?",
 		"> - ¿Pregunta de repaso?",
 		"[^a]: Texto de la nota.",
-		"[**Ponga el VIDEO**](https://www.jw.org/finder?lank=pub-jwb-125_4_VIDEO&wtlocale=S)",
+		"[**Ponga el VIDEO**](https://www.jw.org/finder?lank=pub-jwb-125_4_VIDEO)",
 	} {
 		if !strings.Contains(md, want) {
 			t.Errorf("markdown lacks %q\n---\n%s", want, md)

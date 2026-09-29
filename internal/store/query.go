@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/jjuanrivvera/jwpubkit/internal/content"
 )
 
 // Pub is a publication of the library.
@@ -167,8 +169,13 @@ type SearchHit struct {
 	Num     int     `json:"paragraph,omitempty"`
 	Snippet string  `json:"snippet"`
 	Matches int     `json:"matches"`
-	Rank    float64 `json:"range"`
+	Rank    float64 `json:"rank"`
 	URL     string  `json:"url"`
+	// Issue is the publication's number, kept so a hit can be cited the way
+	// publications cite themselves.
+	Issue string `json:"number,omitempty"`
+	// Cite is that citation, e.g. "w24.05 par. 3".
+	Cite string `json:"cite"`
 }
 
 // FTSQuery turns user words into an FTS5 query: every word must appear,
@@ -260,7 +267,7 @@ func (s *Store) Search(query string, pubs []string, limit int) ([]SearchHit, err
 		FROM hits
 	)
 	SELECT ranked.docid, COALESCE(pub.meps_symbol, pub.symbol), pub.key, COALESCE(doc.title,''), ranked.pid, COALESCE(ranked.num,0),
-		ranked.snip, ranked.n, ranked.rank
+		ranked.snip, ranked.n, ranked.rank, COALESCE(pub.issue,'')
 	FROM ranked JOIN doc ON doc.docid = ranked.docid JOIN pub ON pub.id = doc.pub_id
 	WHERE ranked.rn = 1` + where + `
 	ORDER BY ranked.rank - ln(ranked.n) LIMIT ?`
@@ -272,10 +279,11 @@ func (s *Store) Search(query string, pubs []string, limit int) ([]SearchHit, err
 	var out []SearchHit
 	for rows.Next() {
 		var h SearchHit
-		if err := rows.Scan(&h.DocID, &h.Pub, &h.PubKey, &h.Title, &h.PID, &h.Num, &h.Snippet, &h.Matches, &h.Rank); err != nil {
+		if err := rows.Scan(&h.DocID, &h.Pub, &h.PubKey, &h.Title, &h.PID, &h.Num, &h.Snippet, &h.Matches, &h.Rank, &h.Issue); err != nil {
 			return nil, err
 		}
-		h.URL = fmt.Sprintf("https://wol.jw.org/es/wol/d/r4/lp-s/%d#p%d", h.DocID, h.PID)
+		h.URL = content.DocURL(h.DocID, h.PID)
+		h.Cite = content.Cite("", h.Pub, h.Issue, 0, h.Num, h.DocID, h.PID).Text
 		out = append(out, h)
 	}
 	return out, rows.Err()
@@ -480,7 +488,7 @@ func (s *Store) CitedBy(first, last, limit int) ([]Citation, int, error) {
 		}
 		i, ok := pos[c.DocID]
 		if !ok {
-			c.URL = fmt.Sprintf("https://wol.jw.org/es/wol/d/r4/lp-s/%d", c.DocID)
+			c.URL = content.DocURL(c.DocID, 0)
 			c.Year = year
 			pos[c.DocID] = len(out)
 			out = append(out, c)

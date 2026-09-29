@@ -198,6 +198,22 @@ func (s *Store) migrate() error {
 
 // additiveSchema holds tables that are safe to create on an existing library.
 const additiveSchema = `
+-- Every subtitle cue of every transcript ever fetched, with the millisecond it
+-- starts at, so a phrase can be found in a video and opened at the right second.
+CREATE TABLE IF NOT EXISTS cue(
+	key TEXT NOT NULL, lang TEXT NOT NULL, seq INTEGER NOT NULL,
+	start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL, text TEXT NOT NULL,
+	PRIMARY KEY(key, lang, seq)
+);
+CREATE VIRTUAL TABLE IF NOT EXISTS cue_fts USING fts5(
+	text, tokenize='unicode61 remove_diacritics 2');
+-- cue_fts is kept in step by hand rather than by triggers: the rowid has to be a
+-- stable handle back to a (key, lang, seq), and a contentless external-content
+-- table cannot give that across the composite key.
+CREATE TABLE IF NOT EXISTS cue_map(
+	rowid_ INTEGER PRIMARY KEY, key TEXT NOT NULL, lang TEXT NOT NULL, seq INTEGER NOT NULL
+);
+
 -- The book names of every Bible ever indexed, so references can be read and
 -- written in the library's own language instead of a table shipped per language.
 CREATE TABLE IF NOT EXISTS book_name(

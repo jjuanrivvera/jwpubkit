@@ -7,16 +7,44 @@ import (
 
 // WolDocURL is the wol.jw.org address of a document, optionally at a paragraph.
 func WolDocURL(docid, pid int) string {
-	u := fmt.Sprintf("https://wol.jw.org/es/wol/d/r4/lp-s/%d", docid)
+	return DocURL(docid, pid)
+}
+
+// language is the jw.org symbol used when addressing published content. It is
+// set once at startup; the zero value keeps the addresses working by letting
+// jw.org choose, rather than silently sending everyone to one language.
+var language = ""
+
+// UseLanguage sets the language every address this package builds points at.
+func UseLanguage(lang string) { language = lang }
+
+// DocURL addresses a document, and a paragraph within it, in the language in
+// use.
+//
+// It uses jw.org's finder with the MEPS document id rather than a wol.jw.org
+// path, because a wol path embeds a per-language repository id and library code
+// (/es/wol/d/r4/lp-s/…) that cannot be derived from anything in a JWPUB. The
+// finder takes the docid and the language symbol we already have, resolves to
+// the right article in that language, and honors a paragraph: verified in both
+// Spanish and English, landing on the #p anchor.
+func DocURL(docid, pid int) string {
+	u := fmt.Sprintf("https://www.jw.org/finder?docid=%d", docid)
 	if pid > 0 {
-		u += fmt.Sprintf("#p%d", pid)
+		u += fmt.Sprintf("&par=%d", pid)
+	}
+	if language != "" {
+		u += "&wtlocale=" + language
 	}
 	return u
 }
 
 // FinderURL is the jw.org page that plays a video.
 func FinderURL(key string) string {
-	return "https://www.jw.org/finder?lank=" + key + "&wtlocale=S"
+	u := "https://www.jw.org/finder?lank=" + key
+	if language != "" {
+		u += "&wtlocale=" + language
+	}
+	return u
 }
 
 // RenderOptions tunes Markdown output.

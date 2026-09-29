@@ -19,6 +19,7 @@ import (
 	"github.com/jjuanrivvera/jwpubkit/internal/bible"
 	"github.com/jjuanrivvera/jwpubkit/internal/cdn"
 	"github.com/jjuanrivvera/jwpubkit/internal/config"
+	"github.com/jjuanrivvera/jwpubkit/internal/content"
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 )
 
@@ -121,7 +122,7 @@ Library: ~/.local/share/jwlib (change it with --library, JWPUBKIT_HOME or JWLIB_
 	pf.BoolVar(&a.offline, "offline", false, "stay off the network (no sync, no CDN lookups)")
 	pf.StringVar(&a.lang, "language", a.settle("language", defaultLang, a.cfg.Language, "JWPUBKIT_LANG"), "publication language (jw.org symbol: E english, S spanish, F french…)")
 	pf.BoolVarP(&a.quiet, "quiet", "q", false, "do not print progress on stderr")
-	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.completionCmd(), a.versionCmd())
+	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.readingTimeCmd(), a.completionCmd(), a.versionCmd())
 	return root
 }
 
@@ -167,8 +168,10 @@ func (a *app) store() (*store.Store, error) {
 		return nil, fmt.Errorf("opening the library %s: %w", a.libDir, err)
 	}
 	// Opening the library teaches the bible package the names of every language
-	// it holds a Bible in; this picks which of them references are printed in.
+	// it holds a Bible in; this picks which of them references are printed in,
+	// and points every address this run prints at the same language.
 	bible.UseLanguage(a.lang)
+	content.UseLanguage(a.lang)
 	a.st = st
 	return st, nil
 }

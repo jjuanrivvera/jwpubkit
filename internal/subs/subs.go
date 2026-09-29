@@ -172,3 +172,19 @@ func NormalizeKey(in string) (string, error) {
 	}
 	return "", fmt.Errorf("clave de video no reconocida: %q (ejemplo: pub-jwb-125_4_VIDEO)", in)
 }
+
+// WatchURL builds the jw.org address of a video, at a second when one is given.
+// The finder link is the stable public handle for a media key; the fragment is
+// what players and browsers use to start partway in.
+func WatchURL(key, lang string, seconds int) string {
+	lank := strings.TrimPrefix(key, "pub-")
+	lank = strings.TrimPrefix(lank, "docid-")
+	u := "https://www.jw.org/finder?lank=" + lank
+	if lang != "" {
+		u += "&wtlocale=" + lang
+	}
+	if seconds > 0 {
+		u += "#t=" + strconv.Itoa(seconds)
+	}
+	return u
+}

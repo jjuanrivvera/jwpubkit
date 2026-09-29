@@ -112,6 +112,34 @@ References are parsed in the library's language: "Jer 38:6", "Jeremiah 38:1-13",
 	return cmd
 }
 
+// verseText loads a passage as plain text, for anything that needs the words
+// rather than the structure.
+func (a *app) verseText(reference string) (text, source string, err error) {
+	st, err := a.store()
+	if err != nil {
+		return "", "", err
+	}
+	ranges, err := bible.Parse(reference)
+	if err != nil {
+		return "", "", err
+	}
+	var b strings.Builder
+	for _, r := range ranges {
+		vs, err := st.Verses(r.FirstID(), r.LastID())
+		if err != nil {
+			return "", "", err
+		}
+		if len(vs) == 0 {
+			return "", "", fmt.Errorf("%s is not in the library's Bible", r.Long())
+		}
+		for _, v := range vs {
+			b.WriteString(v.Text)
+			b.WriteByte(' ')
+		}
+	}
+	return b.String(), bible.FormatList(ranges), nil
+}
+
 func mergeCitations(have, add []store.Citation) []store.Citation {
 	idx := map[int]int{}
 	for i, c := range have {

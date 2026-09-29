@@ -106,7 +106,8 @@ pubkit verse "John 3:16" --citations 40 --json
 
 ### `search`
 
-Full-text search across the library:
+Full-text search across the library. Every hit carries the citation in the form publications
+use for themselves, and a link that opens that paragraph in your language:
 
 ```sh
 pubkit search "cistern" --pub it,w --limit 5
@@ -130,11 +131,29 @@ pubkit image 1102025901 --list
 
 ### `subtitles`
 
-Transcribe a video from its subtitles:
+Transcribe a video from its subtitles, and find a phrase in the transcripts you have:
 
 ```sh
 pubkit subtitles pub-jwbai_201507_1_VIDEO --format vtt
+pubkit subtitles find "a phrase" --limit 5
 ```
+
+`find` reports the video, the exact second the phrase is said, and a link that opens it
+there. It searches only transcripts already fetched — fetching one adds it to the set.
+
+### `reading-time`
+
+How long something takes to read aloud — a document, a passage, or text piped in:
+
+```sh
+pubkit reading-time 1102025901
+pubkit reading-time --reference "Jer 38:1-13"
+echo "the text of a talk" | pubkit reading-time
+```
+
+Words are counted where the script separates them and characters where it does not, so the
+estimate holds in Chinese or Thai as well as in Spanish. The rates are assumptions and both
+are overridable (`--wpm`, `--cpm`).
 
 ### `pubs`
 

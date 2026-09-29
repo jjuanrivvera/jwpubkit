@@ -53,6 +53,38 @@ make a choice stick.
 The lesson for testing, too: the verification that missed this ran `export JWPUBKIT_LANG=S`
 in the same command as the check, which guaranteed the result it was supposed to be testing.
 
+## Addresses use jw.org's finder, not a wol path
+
+Every link this tool printed was hardcoded to one language: `wol.jw.org/es/wol/d/r4/lp-s/…`.
+A wol path embeds a per-language repository id (`r4`) and library code (`lp-s`) that cannot be
+derived from anything inside a JWPUB, so there was no way to build the Spanish form for an
+arbitrary language.
+
+`https://www.jw.org/finder?docid=<id>&par=<n>&wtlocale=<lang>` needs only what is already
+known — the MEPS document id and the language symbol — resolves to the article in that
+language, and lands on the paragraph anchor. Verified in Spanish and English against the live
+site.
+
+## Citations quote the publisher where the publisher speaks
+
+A citation composed from parts is a guess about someone else's conventions. Where a publication
+states its own — the caption of an extract is written by the publication, in its own language —
+that string is passed through verbatim. Only where there is none is one assembled, and then in
+the shortened form the publications themselves adopted (`w24.05`), with the pre-2016 dated form
+kept as published (`w13 15/1`).
+
+The page number is missing from assembled citations because it is not recorded: page breaks are
+in the document markup and the index does not keep them. That is a gap to close at index time,
+not something to approximate.
+
+## Reading-aloud time is counted per script, and says it is an estimate
+
+Counting words to estimate reading time is wrong for scripts written without spaces: a Chinese
+paragraph would come out as a couple of seconds. Words are counted where the script separates
+them and characters where it does not, each at its own rate, decided by the text rather than by
+a language setting so a quotation in another script is still counted sensibly. The rates are
+assumptions, labelled as such in the output and overridable.
+
 ## Removing a library is a command, because doing it by hand is a trap
 
 SQLite in WAL mode keeps recently written content in the `-wal` file beside the database. A

@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/jjuanrivvera/jwpubkit/internal/cdn"
+	"github.com/jjuanrivvera/jwpubkit/internal/store"
 	"github.com/jjuanrivvera/jwpubkit/internal/subs"
 )
 
@@ -105,6 +106,10 @@ The key can be pub-jwb-125_4_VIDEO, docid-702017141_1_VIDEO, a jw.org link
 				return err
 			}
 			out.Transcript = subs.Transcript(cues)
+			// Recording the cues is what makes them findable later: `subtitles
+			// find` searches what has been fetched, so fetching one transcript
+			// adds a video to the searchable set.
+			a.recordCues(st, key, cues)
 			if a.jsonOut || format == "json" {
 				out.Cues = cues
 				return a.printJSON(out)
@@ -122,6 +127,88 @@ The key can be pub-jwb-125_4_VIDEO, docid-702017141_1_VIDEO, a jw.org link
 	}
 	cmd.Flags().StringVarP(&format, "format", "f", "txt", "txt, json or vtt")
 	cmd.Flags().BoolVar(&withTimes, "timings", false, "one line per cue, with its timestamp")
+	cmd.AddCommand(a.findCmd())
+	return cmd
+}
+
+// recordCues stores a transcript for searching. A failure here must not spoil the
+// command the user actually asked for, so it is noted on stderr and dropped.
+func (a *app) recordCues(st *store.Store, key string, cues []subs.Cue) {
+	starts := make([]time.Duration, len(cues))
+	ends := make([]time.Duration, len(cues))
+	texts := make([]string, len(cues))
+	for i, c := range cues {
+		starts[i], ends[i], texts[i] = c.Start, c.End, subsLine(c.Text)
+	}
+	if err := st.PutCues(key, a.lang, starts, ends, texts); err != nil {
+		fmt.Fprintf(a.err, "note: the transcript of %s could not be indexed for searching: %v\n", key, err)
+	}
+}
+
+// findCmd searches the transcripts already fetched and says where in the video
+// each hit is. The second matters more than the video: it is what lets someone
+// open the clip at the line they were looking for instead of watching for it.
+func (a *app) findCmd() *cobra.Command {
+	var limit int
+	var allLangs bool
+	cmd := &cobra.Command{
+		Use:     `find "<query>"`,
+		Aliases: []string{"search", "buscar"},
+		Short:   "Find a phrase in the transcripts already fetched, with its timestamp",
+		Long: `Searches the subtitles of every video whose transcript this library has fetched,
+and reports the video, the exact second the phrase is said, and a link that opens
+it there.
+
+Only fetched transcripts are searched — "pubkit subtitles <key>" is what adds a
+video to the set, and "pubkit week" lists the keys of a week's videos. Nothing is
+downloaded by this command.`,
+		Example: `  pubkit subtitles find "cistern"
+  pubkit subtitles find "\"exact phrase\"" --limit 5`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			st, err := a.store()
+			if err != nil {
+				return err
+			}
+			lang := a.lang
+			if allLangs {
+				lang = ""
+			}
+			hits, err := st.SearchCues(args[0], lang, limit)
+			if err != nil {
+				return err
+			}
+			type found struct {
+				store.CueHit
+				Timestamp string `json:"timestamp"`
+				URL       string `json:"url"`
+			}
+			out := make([]found, 0, len(hits))
+			for _, h := range hits {
+				out = append(out, found{CueHit: h, Timestamp: subs.FormatTS(h.Start), URL: subs.WatchURL(h.Key, h.Lang, h.Seconds)})
+			}
+			if a.jsonOut {
+				return a.printJSON(map[string]any{"query": args[0], "hits": out})
+			}
+			if len(out) == 0 {
+				n, _ := st.CueVideoCount(lang)
+				if n == 0 {
+					a.printf("No transcripts have been fetched yet. Fetch one with: pubkit subtitles <key>\n")
+					return nil
+				}
+				a.printf("Nothing found for %q in the transcripts of %d videos.\n", args[0], n)
+				return nil
+			}
+			for _, h := range out {
+				a.printf("%-28s %7s  %s\n", h.Key, h.Timestamp, h.Title)
+				a.printf("%38s%s\n", "", h.Snippet)
+				a.printf("%38s%s\n", "", h.URL)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&limit, "limit", 20, "maximum number of hits")
+	cmd.Flags().BoolVar(&allLangs, "all-languages", false, "search transcripts of every language, not just --language")
 	return cmd
 }
 
