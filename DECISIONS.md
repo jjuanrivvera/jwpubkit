@@ -38,6 +38,21 @@ Parsing accepts every known language at once while display follows `--language`:
 pasted from a Spanish article still resolves while reading an English library, and the two
 spellings mean the same verse either way.
 
+## Settings live in a file, not in the environment
+
+A machine's language was set with `export JWPUBKIT_LANG=S` in a shell profile. Cron, systemd
+and a program launched by another program never read that profile, so the variable arrived
+empty and a Spanish library downloaded an English workbook. Nothing in the output said so,
+because there was nothing wrong to report: the tool did exactly what an unset variable means.
+
+Hence `~/.config/pubkit/config`, read wherever the process runs, and `pubkit config`, which
+prints each setting beside what decided it. Environment variables still work and still win
+over the file — they are how you override one run — but they are no longer the only way to
+make a choice stick.
+
+The lesson for testing, too: the verification that missed this ran `export JWPUBKIT_LANG=S`
+in the same command as the check, which guaranteed the result it was supposed to be testing.
+
 ## One database per language, not one table with a language column
 
 A MEPS document id is the same number in every language: the English and the Spanish edition of

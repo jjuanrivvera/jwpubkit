@@ -282,12 +282,19 @@ func kb(n int) string {
 // variable once instead of passing --media-dir on every call.
 func (a *app) defaultMediaDir() string {
 	for _, env := range []string{"JWPUBKIT_MEDIA_DIR", "JWLIB_MEDIA_DIR"} {
-		if d := os.Getenv(env); d != "" {
+		if d := envOf(env); d != "" {
 			return d
 		}
 	}
+	if a.cfg.MediaDir != "" {
+		return a.cfg.MediaDir
+	}
 	return filepath.Join(a.libDir, "media")
 }
+
+// envOf exists so the settings and the command that explains them read the
+// environment through one door.
+func envOf(name string) string { return os.Getenv(name) }
 
 // storeMedia writes data as <dir>/<xx>/<sha256><ext> and returns the /media/...
 // path, so the same image referenced from several documents is stored once.

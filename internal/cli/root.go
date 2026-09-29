@@ -18,6 +18,7 @@ import (
 
 	"github.com/jjuanrivvera/jwpubkit/internal/bible"
 	"github.com/jjuanrivvera/jwpubkit/internal/cdn"
+	"github.com/jjuanrivvera/jwpubkit/internal/config"
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 )
 
@@ -29,6 +30,8 @@ var Version = "dev"
 const defaultLang = "E"
 
 type app struct {
+	cfg     config.Config
+	origins map[string]string // where each setting came from, for `pubkit config`
 	jsonOut bool
 	libDir  string
 	offline bool
@@ -46,7 +49,7 @@ type app struct {
 func Execute() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	a := &app{out: os.Stdout, err: os.Stderr, ctx: ctx}
+	a := &app{out: os.Stdout, err: os.Stderr, ctx: ctx, cfg: config.Load(), origins: map[string]string{}}
 	root := a.rootCmd()
 	if err := root.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
@@ -114,21 +117,45 @@ Library: ~/.local/share/jwlib (change it with --library, JWPUBKIT_HOME or JWLIB_
 	root.SetGlobalNormalizationFunc(normalizeFlag)
 	pf := root.PersistentFlags()
 	pf.BoolVar(&a.jsonOut, "json", false, "output JSON")
-	pf.StringVar(&a.libDir, "library", store.DefaultDir(), "local library directory")
+	pf.StringVar(&a.libDir, "library", a.settle("library", store.DefaultDir(), a.cfg.Library, "JWPUBKIT_HOME", "JWLIB_HOME"), "local library directory")
 	pf.BoolVar(&a.offline, "offline", false, "stay off the network (no sync, no CDN lookups)")
-	pf.StringVar(&a.lang, "language", langDefault(), "publication language (jw.org symbol: E english, S spanish, F french…)")
+	pf.StringVar(&a.lang, "language", a.settle("language", defaultLang, a.cfg.Language, "JWPUBKIT_LANG"), "publication language (jw.org symbol: E english, S spanish, F french…)")
 	pf.BoolVarP(&a.quiet, "quiet", "q", false, "do not print progress on stderr")
-	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.completionCmd(), a.versionCmd())
+	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.completionCmd(), a.versionCmd())
 	return root
 }
 
-// langDefault lets a library that holds one language say so once, in the
-// environment, instead of every command line repeating --language.
-func langDefault() string {
-	if l := os.Getenv("JWPUBKIT_LANG"); l != "" {
-		return l
+// settle resolves one setting and records where it came from. The order is
+// environment, then the settings file, then the built-in default; a flag on the
+// command line overrides all of them, because cobra applies it afterwards.
+//
+// The settings file sits between them on purpose: a machine whose library is in
+// one language should be able to say so once, somewhere that a cron job or a
+// service will actually read. An exported shell variable is not such a place.
+func (a *app) settle(name, fallback, fromFile string, envs ...string) string {
+	for _, env := range envs {
+		if v := os.Getenv(env); v != "" {
+			a.origins[name] = env
+			return v
+		}
 	}
-	return defaultLang
+	if fromFile != "" {
+		a.origins[name] = a.cfg.Path
+		return fromFile
+	}
+	a.origins[name] = "built-in default"
+	return fallback
+}
+
+// origin names where a setting's value came from, for `pubkit config`.
+func (a *app) origin(cmd *cobra.Command, name string) string {
+	if f := cmd.Root().PersistentFlags().Lookup(name); f != nil && f.Changed {
+		return "--" + name
+	}
+	if o := a.origins[name]; o != "" {
+		return o
+	}
+	return "built-in default"
 }
 
 func (a *app) store() (*store.Store, error) {

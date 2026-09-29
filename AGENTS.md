@@ -25,7 +25,9 @@ The CLI speaks English: commands, flags, help, errors, output labels and JSON ke
 out of a publication stays in the publication's language — that is data, not interface.
 
 Publications are fetched in the language of `--language` (jw.org symbols: `E`, `S`, `F`…),
-default `E`, overridable once with `JWPUBKIT_LANG`.
+default `E`. A machine sets its own in `~/.config/pubkit/config` (`internal/config`); the
+environment still overrides the file, and a flag overrides both. `pubkit config` prints what
+is in effect and why — reach for it before guessing why a command behaved oddly.
 
 Two layers know about languages, and they are not the same:
 

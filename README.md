@@ -33,15 +33,37 @@ make verify      # the gate: format, vet, lint, tests and the coverage floor
 The library defaults to `~/.local/share/jwlib`. Override it with `--library`,
 `JWPUBKIT_HOME` (preferred), or the compatible `JWLIB_HOME` variable.
 
-## Language
+## Language and settings
 
 Publications are fetched in the language you ask for — the jw.org symbols: `E` english,
 `S` spanish, `F` french, and so on:
 
 ```sh
 pubkit sync w --issue 202607 --language S
-export JWPUBKIT_LANG=S        # or set it once for a library that holds one language
 ```
+
+A machine whose library is in one language says so once, in `~/.config/pubkit/config`:
+
+```ini
+# the library on this machine is in spanish
+language = S
+library = ~/.local/share/jwlib
+media_dir = ~/media
+```
+
+The settings file rather than an exported variable, because a variable set in a shell profile
+never reaches a cron job, a service, or a program started by another program — and when it
+does not, nothing says so. `pubkit config` prints every setting with what decided it:
+
+```
+settings file: /home/you/.config/pubkit/config
+
+language   S    /home/you/.config/pubkit/config
+library    …    built-in default
+```
+
+A flag beats an environment variable (`JWPUBKIT_LANG`, `JWPUBKIT_HOME`, `JWPUBKIT_MEDIA_DIR`),
+which beats the file, which beats the default.
 
 Bible references are read and printed in the language of the Bible you synced: English and
 Spanish are built in, and every other language is learned from the Bible itself when it is
