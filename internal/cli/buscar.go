@@ -23,10 +23,10 @@ func (a *app) buscarCmd() *cobra.Command {
 palabras deben aparecer en el mismo párrafo; las tildes no importan; "entre comillas"
 busca la frase exacta y palabra* busca por prefijo. Devuelve el mejor párrafo de cada
 documento: docid, publicación, título, párrafo y extracto.`,
-		Example: `  jwlib buscar "Ébed-Mélec"
-  jwlib buscar "cisterna" --pub it,w
-  jwlib buscar "\"conocimiento exacto\"" --limite 10
-  jwlib buscar "fango cisterna" --biblia`,
+		Example: `  pubkit buscar "Ébed-Mélec"
+  pubkit buscar "cisterna" --pub it,w
+  pubkit buscar "\"conocimiento exacto\"" --limite 10
+  pubkit buscar "fango cisterna" --biblia`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.store()
@@ -61,7 +61,7 @@ documento: docid, publicación, título, párrafo y extracto.`,
 			if len(hits) == 0 && len(verses) == 0 {
 				pl, _ := st.Pubs()
 				if len(pl) == 0 {
-					return errors.New("la biblioteca está vacía: sincroniza algo primero (jwlib sync it w nwtsty)")
+					return errors.New("la biblioteca está vacía: sincroniza algo primero (pubkit sync it w nwtsty)")
 				}
 				a.printf("Sin resultados para %q en %d publicaciones.\n", args[0], len(pl))
 				return nil

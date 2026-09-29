@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: jjuanrivvera/.github/.github/workflows/go-ci.yml@main
+    with:
+      # El suelo medido hoy es 50,5%: internal/cli está en 21% y cdn sin tocar.
+      # La puerta sube conforme se cubra la capa de comandos (issue de cobertura).
+      coverage-threshold: "50"
+      run-gosec: true
+      # No hay tools/gendocs todavía, así que no hay documentación generada que
+      # pueda desincronizarse.
+      run-docs-check: false

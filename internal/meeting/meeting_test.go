@@ -17,18 +17,18 @@ const weekHTML = `<header>
 <h2 id="p2" data-pid="2"><a href="jwpub://b/NWTR/1:1:1-1:1:31" class="b"><strong>GÉNESIS 1,</strong></a><a href="jwpub://b/NWTR/1:2:1-1:2:25" class="b"> <strong>2</strong></a></h2>
 </header>
 <div class="bodyTxt">
-<h3 id="p3" data-pid="3"><a class="xt" href="jwpub://p/S:1102016801/"><strong>Canción 1</strong></a> <strong>y oración | Palabras de introducción</strong> <span>(1 min.)</span></h3>
-<div><h2 id="p4" data-pid="4"><strong>TESOROS DE LA BIBLIA</strong></h2></div>
+<h3 id="p3" data-pid="3"><a class="xt" href="jwpub://p/S:1102016801/"><strong>Canción 1</strong></a> <strong>y oración | Parte inicial de prueba</strong> <span>(1 min.)</span></h3>
+<div><h2 id="p4" data-pid="4"><strong>PRIMERA SECCIÓN DE PRUEBA</strong></h2></div>
 <div id="f1"><figure><img src="jwpub-media://900000001_univ_cnt_1.jpg" alt="Un paisaje." width="1200" height="675"/><figcaption><p id="p40" data-pid="40">Pie de prueba.</p></figcaption></figure></div>
 <h3 id="p5" data-pid="5"><strong>1. Un título de prueba</strong></h3>
 <div><p id="p6" data-pid="6">(10 mins.)</p></div>
 <p id="p7" data-pid="7">Una idea (<a href="jwpub://b/NWTR/1:1:1-1:1:1" class="b">Gé 1:1</a>; <a class="xt" href="jwpub://p/S:900000010/5-5"><em>w99</em> 1/1 3 párr. 2</a>).</p>
-<h3 id="p8" data-pid="8"><strong>2. Busquemos perlas escondidas</strong></h3>
+<h3 id="p8" data-pid="8"><strong>2. Segunda parte de prueba</strong></h3>
 <div><p id="p9" data-pid="9">(10 mins.)</p></div>
 <ul><li><p id="p10" data-pid="10"><a href="jwpub://b/NWTR/1:1:26-1:1:27" class="b">Gé 1:26, 27</a>. ¿Qué pregunta de prueba?</p><div class="gen-field" id="p11" data-pid="11"><label>Respuesta</label><textarea></textarea></div></li></ul>
 <h3 id="p12" data-pid="12"><strong>3. Lectura de la Biblia</strong></h3>
 <div><p id="p13" data-pid="13">(4 mins.) <a href="jwpub://b/NWTR/1:2:1-1:2:9" class="b">Gé 2:1-9</a> (<a class="xt" href="jwpub://p/S:1102018445/"><em>th</em> lección 5</a>).</p></div>
-<div><h2 id="p14" data-pid="14"><strong>NUESTRA VIDA CRISTIANA</strong></h2></div>
+<div><h2 id="p14" data-pid="14"><strong>SEGUNDA SECCIÓN DE PRUEBA</strong></h2></div>
 <h3 id="p15" data-pid="15"><a class="xt" href="jwpub://p/S:1102016802/"><strong>Canción 2</strong></a></h3>
 <h3 id="p16" data-pid="16"><strong>4. <em>“Un video”</em></strong></h3>
 <div><p id="p17" data-pid="17">(15 mins.) Análisis con el auditorio.</p></div>
@@ -37,17 +37,17 @@ const weekHTML = `<header>
 <ul><li><p id="p19" data-pid="19">¿Qué aprendemos?</p><div class="gen-field" id="p20" data-pid="20"></div></li></ul>
 <h3 id="p21" data-pid="21"><strong>5. Estudio bíblico de la congregación</strong></h3>
 <div><p id="p22" data-pid="22">(30 mins.) <a class="xt" href="jwpub://p/S:1102025901/"><em>wcg</em> cap. 1</a>.</p></div>
-<h3 id="p23" data-pid="23"><strong>Palabras de conclusión</strong> <span>(3 mins.)</span> <strong>|</strong> <span><a class="xt" href="jwpub://p/S:1102016803/"><strong>Canción 3</strong></a></span> <strong>y oración</strong></h3>
+<h3 id="p23" data-pid="23"><strong>Parte final de prueba</strong> <span>(3 mins.)</span> <strong>|</strong> <span><a class="xt" href="jwpub://p/S:1102016803/"><strong>Canción 3</strong></a></span> <strong>y oración</strong></h3>
 </div>`
 
-const chapterHTML = `<header><p class="contextTtl" id="p1" data-pid="1"><strong>1</strong> NOÉ</p>
-<h1 id="p2" data-pid="2"><strong>Construyó el arca</strong></h1></header>
+const chapterHTML = `<header><p class="contextTtl" id="p1" data-pid="1"><strong>1</strong> PERSONAJE DE PRUEBA</p>
+<h1 id="p2" data-pid="2"><strong>Título de prueba del capítulo</strong></h1></header>
 <div class="bodyTxt"><p id="p3" data-pid="3">Relato de prueba.</p>
 <h3 id="p4" data-pid="4"><strong>Lea el relato bíblico</strong></h3>
 <ul><li><p id="p5" data-pid="5"><a href="jwpub://b/NWTR/1:6:9-1:6:22" class="b"><strong>Génesis 6:9-22</strong></a></p></li></ul>
-<h3 id="p6" data-pid="6"><strong>¿Qué diría?</strong></h3>
-<p id="p7" data-pid="7"><strong>¿Qué valor mostró Noé?</strong></p><div class="gen-field" id="p8" data-pid="8"></div>
-<h2 id="p9" data-pid="9"><strong>Para saber más</strong></h2>
+<h3 id="p6" data-pid="6"><strong>¿Pregunta de prueba?</strong></h3>
+<p id="p7" data-pid="7"><strong>¿Segunda pregunta de prueba?</strong></p><div class="gen-field" id="p8" data-pid="8"></div>
+<h2 id="p9" data-pid="9"><strong>Sección final de prueba</strong></h2>
 <p id="p10" data-pid="10"><a href="https://www.jw.org/finder?lank=pub-jwbai_201507_1_VIDEO&amp;wtlocale=S" data-video="webpubvid://?pub=jwbai&amp;issue=201507&amp;track=1&amp;langwritten=S"><strong><em>Un video complementario</em> (4:58)</strong></a></p>
 </div>`
 
@@ -64,7 +64,7 @@ var workbook = testutil.Pub{
 		{DocID: 1, ExtractID: 2, Link: "p/S:900000010/5-5", Caption: caption("w99 1/1 pág. 3", "Un artículo viejo"), HTML: `<p id="p5" data-pid="5"><span class="parNum" data-pnum="2"></span>Texto citado.</p>`, RefDocID: 900000010, RefSymbol: "w99", RefUndated: "w", RefIssue: 19990101, BeginPID: 7, Sort: 2},
 		{DocID: 1, ExtractID: 3, Link: "p/S:1102018445/", Caption: caption("th pág. 8", "Leer con exactitud"), HTML: "<p>lección</p>", RefDocID: 1102018445, RefSymbol: "th", RefUndated: "th", BeginPID: 13, Sort: 3},
 		{DocID: 1, ExtractID: 4, Link: "p/S:1102016802/", Caption: caption("sjj canción 2", "Segunda canción"), HTML: "<p>letra</p>", RefDocID: 1102016802, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 15, Sort: 4},
-		{DocID: 1, ExtractID: 5, Link: "p/S:1102025901/", Caption: caption("wcg págs. 4-9", "Construyó el arca"), HTML: chapterHTML, RefDocID: 1102025901, RefSymbol: "wcg", RefUndated: "wcg", BeginPID: 22, Sort: 5},
+		{DocID: 1, ExtractID: 5, Link: "p/S:1102025901/", Caption: caption("wcg págs. 4-9", "Título de prueba del capítulo"), HTML: chapterHTML, RefDocID: 1102025901, RefSymbol: "wcg", RefUndated: "wcg", BeginPID: 22, Sort: 5},
 		{DocID: 1, ExtractID: 6, Link: "p/S:1102016803/", Caption: caption("sjj canción 3", "Tercera canción"), HTML: "<p>letra</p>", RefDocID: 1102016803, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 23, Sort: 6},
 	},
 	Media: []testutil.Media{
@@ -144,7 +144,7 @@ func TestBuildWeekSynthetic(t *testing.T) {
 			titles = append(titles, p.Title)
 		}
 	}
-	if strings.Join(titles, "|") != "Palabras de introducción|Un título de prueba|Busquemos perlas escondidas|Lectura de la Biblia|“Un video”|Estudio bíblico de la congregación|Palabras de conclusión" {
+	if strings.Join(titles, "|") != "Parte inicial de prueba|Un título de prueba|Segunda parte de prueba|Lectura de la Biblia|“Un video”|Estudio bíblico de la congregación|Parte final de prueba" {
 		t.Errorf("titles %q", titles)
 	}
 	if p := parts[1]; p.Minutes != 10 || len(p.Images) != 1 || p.Images[0].Caption != "Pie de prueba." {
@@ -156,7 +156,7 @@ func TestBuildWeekSynthetic(t *testing.T) {
 			ref = r
 		}
 	}
-	if ref.DocID != 900000010 || ref.Pars != "5-5" || ref.Title != "Un artículo viejo" || ref.Extract != "2 Texto citado." || ref.Sync != "jwlib sync w --issue 19990101" {
+	if ref.DocID != 900000010 || ref.Pars != "5-5" || ref.Title != "Un artículo viejo" || ref.Extract != "2 Texto citado." || ref.Sync != "pubkit sync w --issue 19990101" {
 		t.Errorf("reference %+v", ref)
 	}
 	if p := parts[2]; len(p.Questions) != 1 || p.Questions[0] != "Gé 1:26, 27. ¿Qué pregunta de prueba?" {
@@ -166,8 +166,8 @@ func TestBuildWeekSynthetic(t *testing.T) {
 		t.Errorf("part 4 %+v", p)
 	}
 	sc := parts[5].Study
-	if sc == nil || sc.DocID != 1102025901 || sc.Title != "Construyó el arca" || sc.Label != "1 NOÉ" ||
-		len(sc.Accounts) != 1 || sc.Accounts[0] != "Génesis 6:9-22" || len(sc.Groups) != 1 || sc.Groups[0].Questions[0] != "¿Qué valor mostró Noé?" ||
+	if sc == nil || sc.DocID != 1102025901 || sc.Title != "Título de prueba del capítulo" || sc.Label != "1 PERSONAJE DE PRUEBA" ||
+		len(sc.Accounts) != 1 || sc.Accounts[0] != "Génesis 6:9-22" || len(sc.Groups) != 1 || sc.Groups[0].Questions[0] != "¿Segunda pregunta de prueba?" ||
 		len(sc.Videos) != 1 || sc.Videos[0].Key != "pub-jwbai_201507_1_VIDEO" {
 		t.Errorf("study chapter %+v", sc)
 	}

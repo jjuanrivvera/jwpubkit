@@ -1,0 +1,11 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  release:
+    uses: jjuanrivvera/.github/.github/workflows/go-release.yml@main
+    secrets: inherit

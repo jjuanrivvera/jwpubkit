@@ -60,9 +60,9 @@ se queda con la de más píxeles y, a igualdad, con la de más calidad (más byt
 
 --media-store las guarda además en el almacén por contenido del repo jw:
 <media-dir>/<xx>/<sha256>.<ext>, y muestra la ruta /media/... para el markdown.`,
-		Example: `  jwlib imagen 202026255 --salida /tmp/semana
-  jwlib imagen 1102025910 --media-store --listar=false
-  jwlib imagen 2026485 --listar`,
+		Example: `  pubkit imagen 202026255 --salida /tmp/semana
+  pubkit imagen 1102025910 --media-store --listar=false
+  pubkit imagen 2026485 --listar`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			docid, err := strconv.Atoi(args[0])

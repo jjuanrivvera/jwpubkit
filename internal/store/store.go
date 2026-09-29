@@ -22,9 +22,15 @@ type Store struct {
 	Dir string
 }
 
-// DefaultDir is $JWLIB_HOME, else $XDG_DATA_HOME/jwlib, else
+// DefaultDir is $JWPUBKIT_HOME, else $JWLIB_HOME, else $XDG_DATA_HOME/jwlib, else
 // ~/.local/share/jwlib.
 func DefaultDir() string {
+	// JWPUBKIT_HOME is the current name; JWLIB_HOME keeps working because libraries built
+	// before the rename live where it points, and moving someone's 900 MB library to match a
+	// new binary name would be a rude way to ship a rename.
+	if d := os.Getenv("JWPUBKIT_HOME"); d != "" {
+		return d
+	}
 	if d := os.Getenv("JWLIB_HOME"); d != "" {
 		return d
 	}

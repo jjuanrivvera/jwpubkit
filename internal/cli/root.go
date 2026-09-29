@@ -1,4 +1,4 @@
-// Package cli wires the jwlib commands.
+// Package cli wires the pubkit commands.
 package cli
 
 import (
@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 )
 
-// Version is set at build time with -ldflags "-X jwlib/internal/cli.Version=…".
+// Version is set at build time with -ldflags "-X github.com/jjuanrivvera/jwpubkit/internal/cli.Version=…".
 var Version = "dev"
 
 type app struct {
@@ -49,15 +50,22 @@ func Execute() int {
 }
 
 func (a *app) rootCmd() *cobra.Command {
+	name := filepath.Base(os.Args[0])
+	name = strings.TrimSuffix(name, filepath.Ext(name))
+	if name == "." || name == string(filepath.Separator) || name == "" {
+		name = "pubkit"
+	}
 	root := &cobra.Command{
-		Use:   "jwlib",
-		Short: "Lee las publicaciones de la JW (JWPUB) sin pasar por wol",
-		Long: `jwlib descarga publicaciones en formato JWPUB desde la CDN abierta de jw.org,
-las descifra y las indexa en una biblioteca local (SQLite + FTS5) para consultar
-la reunión de la semana, versículos de la TNM con sus notas, búsquedas,
-documentos completos, imágenes y subtítulos de videos.
+		Use:   name,
+		Short: "Lee publicaciones en formato JWPUB desde una biblioteca local",
+		Long: `` + name + ` descarga publicaciones en formato JWPUB desde la CDN abierta de jw.org,
+las descifra y las indexa en una biblioteca local (SQLite + FTS5) para consultar la
+reunión de la semana, pasajes bíblicos con sus notas, búsquedas, documentos completos,
+imágenes y subtítulos de videos.
 
-Biblioteca: ~/.local/share/jwlib (cámbiala con --biblioteca o JWLIB_HOME).`,
+No redistribuye ninguna publicación: trabaja con lo que tú descargas, en tu máquina.
+
+Biblioteca: ~/.local/share/jwlib (cámbiala con --biblioteca, JWPUBKIT_HOME o JWLIB_HOME).`,
 		Version:       Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -74,7 +82,7 @@ Biblioteca: ~/.local/share/jwlib (cámbiala con --biblioteca o JWLIB_HOME).`,
 	pf.BoolVar(&a.offline, "sin-red", false, "no usar la red (no sincroniza ni consulta la CDN)")
 	pf.StringVar(&a.lang, "idioma", "S", "idioma de las publicaciones (código de jw.org; S = español)")
 	pf.BoolVarP(&a.quiet, "silencioso", "q", false, "no mostrar progreso en stderr")
-	root.AddCommand(a.syncCmd(), a.semanaCmd(), a.versiculoCmd(), a.buscarCmd(), a.docCmd(), a.imagenCmd(), a.subtitulosCmd(), a.pubsCmd(), a.expedienteCmd())
+	root.AddCommand(a.syncCmd(), a.semanaCmd(), a.versiculoCmd(), a.buscarCmd(), a.docCmd(), a.imagenCmd(), a.subtitulosCmd(), a.pubsCmd(), a.expedienteCmd(), a.completionCmd(), a.versionCmd())
 	return root
 }
 

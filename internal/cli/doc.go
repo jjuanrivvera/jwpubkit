@@ -59,13 +59,13 @@ func (a *app) docCmd() *cobra.Command {
 		Long: `Muestra un documento de la biblioteca por su docid (el mismo número de wol:
 wol.jw.org/es/wol/d/r4/lp-s/<docid>) con párrafos numerados como los citan las
 publicaciones, preguntas de estudio, citas bíblicas, referencias a otras publicaciones
-(con su docid) e imágenes (sus archivos se bajan con "jwlib imagen <docid>").
+(con su docid) e imágenes (sus archivos se bajan con "pubkit imagen <docid>").
 
 Si el documento no está sincronizado pero otra publicación trae un extracto de él
 (la Guía trae el capítulo del libro de estudio, por ejemplo), muestra ese extracto.`,
-		Example: `  jwlib doc 2026485
-  jwlib doc 1200001265 --formato txt
-  jwlib doc 202026255 --formato json | jq '.parrafos[] | select(.pregunta)'`,
+		Example: `  pubkit doc 2026485
+  pubkit doc 1200001265 --formato txt
+  pubkit doc 202026255 --formato json | jq '.parrafos[] | select(.pregunta)'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			docid, err := strconv.Atoi(args[0])
@@ -120,7 +120,7 @@ func (a *app) loadDoc(st *store.Store, docid int) (*docOut, *content.Doc, error)
 		htmlText = d.HTML
 		out.Pub, out.PubKey, out.Title, out.Context = d.Pub.MepsSymbol, d.Pub.Key, d.Title, d.ContextTitle
 		if htmlText == "" {
-			return nil, nil, fmt.Errorf("el documento %d (%s) no tiene contenido propio (en una Biblia el texto está en los versículos: usa jwlib versiculo)", docid, d.Title)
+			return nil, nil, fmt.Errorf("el documento %d (%s) no tiene contenido propio (en una Biblia el texto está en los versículos: usa pubkit versiculo)", docid, d.Title)
 		}
 	case errors.Is(err, store.ErrNoDoc):
 		exts, xerr := st.ExtractsFor(docid)
@@ -128,7 +128,7 @@ func (a *app) loadDoc(st *store.Store, docid int) (*docOut, *content.Doc, error)
 			return nil, nil, xerr
 		}
 		if len(exts) == 0 {
-			return nil, nil, fmt.Errorf("el documento %d no está en la biblioteca ni hay extractos de él; sincroniza su publicación (jwlib pubs para ver lo que hay)", docid)
+			return nil, nil, fmt.Errorf("el documento %d no está en la biblioteca ni hay extractos de él; sincroniza su publicación (pubkit pubs para ver lo que hay)", docid)
 		}
 		e := exts[0]
 		htmlText = e.HTML
@@ -199,12 +199,12 @@ func (a *app) loadDoc(st *store.Store, docid int) (*docOut, *content.Doc, error)
 func syncCommand(e store.Extract) string {
 	sym := e.RefUndated
 	if sym == "" {
-		return "jwlib sync <símbolo>"
+		return "pubkit sync <símbolo>"
 	}
 	if e.RefIssue != 0 {
-		return fmt.Sprintf("jwlib sync %s --issue %s", sym, store.NormalizeIssue(strconv.Itoa(e.RefIssue)))
+		return fmt.Sprintf("pubkit sync %s --issue %s", sym, store.NormalizeIssue(strconv.Itoa(e.RefIssue)))
 	}
-	return "jwlib sync " + sym
+	return "pubkit sync " + sym
 }
 
 func (a *app) printReferences(out *docOut) {

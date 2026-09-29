@@ -15,7 +15,7 @@ import (
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 )
 
-// Week is everything `jwlib semana` reports.
+// Week is everything `pubkit semana` reports.
 type Week struct {
 	Monday            string        `json:"lunes"`
 	Range             string        `json:"rango"`
@@ -67,7 +67,7 @@ type Song struct {
 	Video  string `json:"video"`
 }
 
-// Section groups parts: TESOROS DE LA BIBLIA, SEAMOS MEJORES MAESTROS, NUESTRA VIDA CRISTIANA.
+// Section groups the parts under one of the workbook's top-level headings.
 type Section struct {
 	Title string `json:"titulo"`
 	Parts []Part `json:"partes"`
@@ -141,7 +141,7 @@ type StudyChapter struct {
 	Paragraphs int             `json:"parrafos"`
 }
 
-// QuestionGroup is a heading with its questions ("¿Qué diría?").
+// QuestionGroup is a heading together with the questions listed under it.
 type QuestionGroup struct {
 	Title     string   `json:"titulo"`
 	Questions []string `json:"preguntas"`
@@ -355,7 +355,7 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 			}
 		}
 		for _, v := range blk.Videos {
-			vid := Video{Key: v.Key, Title: videoTitle(v.Title), Part: part.label(), Command: "jwlib subtitulos " + v.Key}
+			vid := Video{Key: v.Key, Title: videoTitle(v.Title), Part: part.label(), Command: "pubkit subtitulos " + v.Key}
 			part.Videos = append(part.Videos, vid)
 			w.Videos = append(w.Videos, vid)
 		}
@@ -478,7 +478,7 @@ func (w *Week) partAt(pid int) *Part {
 }
 
 // partTitle drops the song announcement from a heading:
-// "Canción 102 y oración | Palabras de introducción (1 min.)" → "Palabras de introducción".
+// "Canción 102 y oración | Título de la parte (1 min.)" → "Título de la parte".
 func partTitle(h string) string {
 	var keep []string
 	for _, piece := range strings.Split(h, "|") {
@@ -563,9 +563,9 @@ func syncHint(e store.Extract) string {
 		return ""
 	}
 	if e.RefIssue != 0 {
-		return fmt.Sprintf("jwlib sync %s --issue %s", sym, store.NormalizeIssue(strconv.Itoa(e.RefIssue)))
+		return fmt.Sprintf("pubkit sync %s --issue %s", sym, store.NormalizeIssue(strconv.Itoa(e.RefIssue)))
 	}
-	return "jwlib sync " + sym
+	return "pubkit sync " + sym
 }
 
 // studyChapter reads the congregation study chapter from the extract.
@@ -614,7 +614,7 @@ func studyChapter(e store.Extract) (*StudyChapter, error) {
 			}
 		}
 		for _, v := range blk.Videos {
-			sc.Videos = append(sc.Videos, Video{Key: v.Key, Title: videoTitle(v.Title), Command: "jwlib subtitulos " + v.Key})
+			sc.Videos = append(sc.Videos, Video{Key: v.Key, Title: videoTitle(v.Title), Command: "pubkit subtitulos " + v.Key})
 		}
 	}
 	// Keep only groups that ask something.

@@ -1,4 +1,4 @@
-// Command jwlib reads JW publications (JWPUB) from a local library.
+// Command pubkit reads JWPUB files from a local library.
 package main
 
 import (

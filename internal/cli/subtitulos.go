@@ -36,15 +36,15 @@ func (a *app) subtitulosCmd() *cobra.Command {
 		Short:   "Transcripción de un video de la JW desde sus subtítulos",
 		Long: `Pide el video a la API mediator (b.jw-cdn.org/apis/mediator/v1/media-items/S/<clave>),
 toma el archivo de subtítulos (WebVTT) y lo convierte en una transcripción legible. Si el
-mediator no trae subtítulos, prueba el campo "subtitles" de pub-media. "jwlib semana"
+mediator no trae subtítulos, prueba el campo "subtitles" de pub-media. "pubkit semana"
 lista las claves de los videos de la reunión.
 
 La clave puede ser pub-jwb-125_4_VIDEO, docid-702017141_1_VIDEO, un enlace de jw.org
 (finder?lank=...), webpubvid://?pub=...&track=... o la forma corta pub:track
 (jwb-125:4) o pub:issue:track (jwbai:201507:1).`,
-		Example: `  jwlib subtitulos pub-jwb-125_4_VIDEO
-  jwlib subtitulos jwb-125:4 --tiempos
-  jwlib subtitulos pub-jwbcov21_11_VIDEO --formato vtt > video.vtt`,
+		Example: `  pubkit subtitulos pub-jwb-125_4_VIDEO
+  pubkit subtitulos jwb-125:4 --tiempos
+  pubkit subtitulos pub-jwbcov21_11_VIDEO --formato vtt > video.vtt`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, err := subs.NormalizeKey(args[0])

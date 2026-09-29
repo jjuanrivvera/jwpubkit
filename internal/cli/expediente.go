@@ -104,7 +104,7 @@ CAPÍTULO pensado para que un agente que prepara un discurso o un video lo lea u
 vez, en vez de repasar wol.jw.org en muchas llamadas. Para cada capítulo del rango:
 
   1. Texto TNM (edición de estudio), notas de estudio, notas al pie y referencias
-     marginales, con la misma fidelidad que "jwlib versiculo".
+     marginales, con la misma fidelidad que "pubkit versiculo".
   2. Los documentos de la biblioteca que citan cada versículo (tabla BibleCitation),
      con el extracto del párrafo que cita, deduplicados por documento/párrafo y con
      los versículos que citan cada uno. Se ordenan por cuántos versículos distintos
@@ -121,8 +121,8 @@ Escribe un .md por capítulo y un .json con todos los capítulos en --salida (la
 actual por defecto). Cada .md trae, al final, una estimación de tokens (heurística
 caracteres/4); si un capítulo se pasa del presupuesto, se recortan los extractos de las
 citas (nunca se quitan versículos ni citas).`,
-		Example: `  jwlib expediente "Gén 37-41" --salida /tmp/expediente
-  jwlib expediente "Jer 38-39" --json | jq '.capitulos[].conteo_citas'`,
+		Example: `  pubkit expediente "Gén 37-41" --salida /tmp/expediente
+  pubkit expediente "Jer 38-39" --json | jq '.capitulos[].conteo_citas'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.store()
@@ -131,7 +131,7 @@ citas (nunca se quitan versículos ni citas).`,
 			}
 			if !st.HasBible() {
 				if a.offline {
-					return fmt.Errorf("la Biblia de estudio no está en la biblioteca: jwlib sync nwtsty")
+					return fmt.Errorf("la Biblia de estudio no está en la biblioteca: pubkit sync nwtsty")
 				}
 				a.logf("la Biblia de estudio (nwtsty, ~127 MB) no está en la biblioteca; sincronizando")
 				if _, err := a.syncOne("nwtsty", "", false); err != nil {
@@ -379,7 +379,7 @@ func (a *app) chapterCitations(st *store.Store, verses []store.Verse) ([]citatio
 
 // chapterImages lists the images of the documents cited in the chapter, with
 // the width/height the library recorded when the JWPUB was indexed. No
-// network call: comparing against the CDN (as "jwlib imagen" does) would
+// network call: comparing against the CDN (as "pubkit imagen" does) would
 // need to download bytes, which expediente is built to avoid entirely.
 func (a *app) chapterImages(st *store.Store, cites []citationOut) ([]imageOut, []string) {
 	seenDocs := map[int]bool{}
@@ -614,7 +614,7 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 		}
 		fmt.Fprintf(&b, "   > %s\n", extract)
 		if cut {
-			b.WriteString("   (extracto recortado; texto completo: jwlib doc " + fmt.Sprint(c.DocID) + ")\n")
+			b.WriteString("   (extracto recortado; texto completo: pubkit doc " + fmt.Sprint(c.DocID) + ")\n")
 		}
 	}
 

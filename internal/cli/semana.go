@@ -24,15 +24,15 @@ func (a *app) semanaCmd() *cobra.Command {
 actividades: docid, lectura bíblica semanal, lectura del estudiante y su lección de
 "Seamos mejores maestros", canciones, cada parte con su título, tiempo, preguntas,
 referencias (citas y docids, con el texto que la Guía trae de cada referencia), videos
-(con su clave para "jwlib subtitulos") e imágenes. El estudio bíblico de la congregación
+(con su clave para "pubkit subtitulos") e imágenes. El estudio bíblico de la congregación
 incluye el capítulo completo que trae la Guía: título, relatos, preguntas y videos.
 
 Si existe, agrega La Atalaya de estudio de esa semana: docid, título, texto temático,
 canciones y preguntas por párrafo. Si falta la Guía o La Atalaya en la biblioteca, las
 sincroniza (salvo con --sin-red).`,
-		Example: `  jwlib semana 2026-09-28
-  jwlib semana 2026-09-30 --extractos
-  jwlib semana --json 2026-09-28 | jq '.secciones[].partes[] | {numero, titulo, minutos}'`,
+		Example: `  pubkit semana 2026-09-28
+  pubkit semana 2026-09-30 --extractos
+  pubkit semana --json 2026-09-28 | jq '.secciones[].partes[] | {numero, titulo, minutos}'`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			day := time.Now()
@@ -76,7 +76,7 @@ func (a *app) buildWeek(day time.Time, withWT bool) (*meeting.Week, error) {
 	if dd == nil {
 		issue := meeting.WorkbookIssue(monday)
 		if a.offline {
-			return nil, fmt.Errorf("la Guía de la semana del %s no está en la biblioteca (jwlib sync mwb --issue %s)", w.Monday, issue)
+			return nil, fmt.Errorf("la Guía de la semana del %s no está en la biblioteca (pubkit sync mwb --issue %s)", w.Monday, issue)
 		}
 		a.logf("la Guía mwb %s no está en la biblioteca; sincronizando", issue)
 		if _, err := a.syncOne("mwb", issue, false); err != nil {
@@ -192,7 +192,7 @@ func (a *app) printWeek(w *meeting.Week, extracts bool) {
 		}
 	}
 	if len(w.Videos) > 0 {
-		p("\nVideos de la reunión (transcripción: jwlib subtitulos <clave>)\n")
+		p("\nVideos de la reunión (transcripción: pubkit subtitulos <clave>)\n")
 		seen := map[string]bool{}
 		for _, v := range w.Videos {
 			if seen[v.Key] {
@@ -237,7 +237,7 @@ func (a *app) printWeek(w *meeting.Week, extracts bool) {
 			}
 		}
 		if len(wt.Images) > 0 {
-			p("  Imágenes (jwlib imagen %d):\n", wt.DocID)
+			p("  Imágenes (pubkit imagen %d):\n", wt.DocID)
 			for _, im := range wt.Images {
 				p("    %s · %s\n", im.File, firstNonEmpty(im.Caption, im.Alt))
 			}
@@ -328,7 +328,7 @@ func (a *app) printPart(part meeting.Part, extracts bool) {
 			p("\n")
 		}
 		if len(sc.Images) > 0 {
-			p("     Imágenes del capítulo: %d (jwlib imagen %d)\n", len(sc.Images), sc.DocID)
+			p("     Imágenes del capítulo: %d (pubkit imagen %d)\n", len(sc.Images), sc.DocID)
 		}
 	}
 }

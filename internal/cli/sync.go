@@ -22,11 +22,11 @@ de la CDN no descarga nada.
 Símbolos útiles: mwb (Guía de actividades, con --issue AAAAMM), w (La Atalaya de
 estudio, con --issue AAAAMM; las anteriores a 2016 usan AAAAMMDD), nwtsty (Biblia
 de estudio), it (Perspicacia), wcg, lmd, th, jr, gl, lff, ijwia, sjj...`,
-		Example: `  jwlib sync mwb --issue 202609
-  jwlib sync w --issue 202607
-  jwlib sync nwtsty it wcg
-  jwlib sync w --issue 20130115
-  jwlib sync --archivo ~/Descargas/mwb_S_202609.jwpub mwb --issue 202609`,
+		Example: `  pubkit sync mwb --issue 202609
+  pubkit sync w --issue 202607
+  pubkit sync nwtsty it wcg
+  pubkit sync w --issue 20130115
+  pubkit sync --archivo ~/Descargas/mwb_S_202609.jwpub mwb --issue 202609`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.store()
@@ -109,7 +109,7 @@ func (a *app) pubsCmd() *cobra.Command {
 				return a.printJSON(pubs)
 			}
 			if len(pubs) == 0 {
-				a.printf("La biblioteca %s está vacía. Empieza con: jwlib sync mwb --issue AAAAMM\n", a.libDir)
+				a.printf("La biblioteca %s está vacía. Empieza con: pubkit sync mwb --issue AAAAMM\n", a.libDir)
 				return nil
 			}
 			var total int64

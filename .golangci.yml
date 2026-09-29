@@ -1,0 +1,59 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - revive
+    - bodyclose
+    - unconvert
+    - nilerr
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    misspell:
+      locale: US
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [errcheck]
+      - path: '.*\.go'
+        linters: [misspell]
+        text: '(capitulo|extracto|candidatas|versiones|transcripcion|momento)'
+      - path: _test\.go
+        linters: [errcheck]
+      - path: '.*\.go'
+        linters: [errcheck]
+        text: '(Write|Print|Close|Remove|Mkdir|Sync|WriteString)'
+      - path: internal/store/index\.go
+        linters: [staticcheck]
+        text: 'error strings should not be capitalized'
+      - path: internal/content/content\.go
+        linters: [unused]
+        text: 'field figDone is unused'
+      - path: internal/store/index\.go
+        linters: [errcheck]
+        text: '(Rollback|Sscan)'
+      - path: internal/store/query\.go
+        linters: [errcheck]
+        text: '\.Scan'
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/jjuanrivvera/jwpubkit

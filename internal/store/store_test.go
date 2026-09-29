@@ -33,11 +33,11 @@ var encyclopedia = testutil.Pub{
 	Docs: []testutil.Doc{
 		{ID: 0, MepsID: 1200000001, Class: 2, Title: "Cisterna",
 			HTML: `<h1 id="p1" data-pid="1"><strong>CISTERNA</strong></h1>
-<p id="p2" data-pid="2" class="sb"><span class="parNum" data-pnum="1"></span>Depósito excavado para almacenar agua de lluvia (<a href="jwpub://b/NWTR/24:38:6-24:38:6" class="b">Jer 38:6</a>).</p>
-<p id="p3" data-pid="3" class="sb"><span class="parNum" data-pnum="2"></span>Una cisterna vacía tenía fango en el fondo.</p>`},
+<p id="p2" data-pid="2" class="sb"><span class="parNum" data-pnum="1"></span>Entrada de prueba sobre un pozo de agua de lluvia (<a href="jwpub://b/NWTR/24:38:6-24:38:6" class="b">Jer 38:6</a>).</p>
+<p id="p3" data-pid="3" class="sb"><span class="parNum" data-pnum="2"></span>Segundo párrafo de prueba: la cisterna vacía y su fango.</p>`},
 		{ID: 1, MepsID: 1200000002, Class: 2, Title: "Ébed-mélec",
 			HTML: `<h1 id="p1" data-pid="1"><strong>ÉBED-MÉLEC</strong></h1>
-<p id="p2" data-pid="2" class="sb"><span class="parNum" data-pnum="1"></span>Eunuco etíope que rescató a Jeremías (<a href="jwpub://b/NWTR/24:38:7-24:38:13" class="b">Jer 38:7-13</a>).</p>`},
+<p id="p2" data-pid="2" class="sb"><span class="parNum" data-pnum="1"></span>Entrada de prueba sobre el personaje que rescató a Jeremías (<a href="jwpub://b/NWTR/24:38:7-24:38:13" class="b">Jer 38:7-13</a>).</p>`},
 	},
 }
 

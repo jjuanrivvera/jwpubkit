@@ -1,23 +1,38 @@
-VERSION ?= $(shell git describe --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X jwlib/internal/cli.Version=$(VERSION)
+BINARY := pubkit
+MODULE := github.com/jjuanrivvera/jwpubkit
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -s -w -X $(MODULE)/internal/cli.Version=$(VERSION)
+PREFIX ?= $(HOME)/.local/bin
+# El suelo de cobertura; el mismo número que .github/workflows/ci.yml.
+COVER_MIN ?= 50
 
-.PHONY: build test vet install vps clean
+.PHONY: build install test lint verify cover-check clean
 
-# Static linux/amd64 binary: pure-Go SQLite (modernc.org/sqlite), no cgo.
 build:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/jwlib .
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '$(LDFLAGS)' -o bin/$(BINARY) .
+
+install: build
+	install -d '$(PREFIX)'
+	install -m 0755 bin/$(BINARY) '$(PREFIX)/$(BINARY)'
+	ln -sfn $(BINARY) '$(PREFIX)/jwlib'
 
 test:
 	go test ./...
 
-vet:
+lint:
+	golangci-lint run ./...
+
+# La puerta. No modifica el árbol: si algo está mal, falla y lo dice.
+verify: lint
+	@test -z "$$(gofmt -l . | tee /dev/stderr)" || { echo 'gofmt: los archivos de arriba no están formateados'; exit 1; }
 	go vet ./...
+	go test -coverprofile=coverage.out ./...
+	@$(MAKE) --no-print-directory cover-check
 
-install: build
-	install -m 0755 bin/jwlib $(HOME)/.local/bin/jwlib
-
-vps: build
-	scp bin/jwlib VPS:~/.local/bin/jwlib
+# El mismo suelo que exige el CI, medido igual.
+cover-check:
+	@total=$$(go tool cover -func=coverage.out | awk '/^total:/ {print substr($$3, 1, length($$3)-1)}'); \
+	awk -v t="$$total" -v min="$(COVER_MIN)" 'BEGIN { if (t+0 < min+0) { printf "cobertura %.1f%% < %s%%\n", t, min; exit 1 } printf "cobertura %.1f%% (mínimo %s%%)\n", t, min }'
 
 clean:
-	rm -rf bin
+	rm -rf bin dist coverage.out

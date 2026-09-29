@@ -32,9 +32,9 @@ biblioteca que citan el pasaje (tabla BibleCitation de cada publicación sincron
 
 Acepta referencias en español: "Jer 38:6", "Jeremías 38:1-13", "1 Cor. 13:4-7",
 "Sal 23", "Jer 38:28-39:2", "Jer 38:6; 39:1, 4-6".`,
-		Example: `  jwlib versiculo "Jer 38:6"
-  jwlib versiculo "Jer 38:1-13" --sin-notas
-  jwlib versiculo "Juan 3:16" --citas 40 --json`,
+		Example: `  pubkit versiculo "Jer 38:6"
+  pubkit versiculo "Jer 38:1-13" --sin-notas
+  pubkit versiculo "Juan 3:16" --citas 40 --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ranges, err := bible.Parse(args[0])
@@ -47,7 +47,7 @@ Acepta referencias en español: "Jer 38:6", "Jeremías 38:1-13", "1 Cor. 13:4-7"
 			}
 			if !st.HasBible() {
 				if a.offline {
-					return fmt.Errorf("la Biblia de estudio no está en la biblioteca: jwlib sync nwtsty")
+					return fmt.Errorf("la Biblia de estudio no está en la biblioteca: pubkit sync nwtsty")
 				}
 				a.logf("la Biblia de estudio (nwtsty, ~127 MB) no está en la biblioteca; sincronizando")
 				if _, err := a.syncOne("nwtsty", "", false); err != nil {
