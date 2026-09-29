@@ -141,6 +141,27 @@ func (s *Store) teachBookNames() {
 	}
 }
 
+// Files are the files that make up this language's database. SQLite in WAL mode
+// keeps recent content in the -wal file, so the three are one unit: the main file
+// can be a few kilobytes while megabytes of indexed publications sit beside it,
+// and deleting one of the three leaves the rest to be applied to whatever is
+// created next. Anything that removes a library removes these together.
+func (s *Store) Files() []string {
+	return []string{s.Path, s.Path + "-wal", s.Path + "-shm"}
+}
+
+// Size is how much disk this language's database takes, counting the -wal, which
+// is where the bytes actually are right after indexing.
+func (s *Store) Size() int64 {
+	var total int64
+	for _, f := range s.Files() {
+		if st, err := os.Stat(f); err == nil {
+			total += st.Size()
+		}
+	}
+	return total
+}
+
 // Close closes the database.
 func (s *Store) Close() error { return s.DB.Close() }
 

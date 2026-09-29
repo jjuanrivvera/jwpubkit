@@ -153,6 +153,25 @@ document meant to be read once:
 pubkit dossier "Jer 38:1-13" --json
 ```
 
+### `drop`
+
+Remove one language's indexed library. It reports first and removes nothing without `--yes`,
+and it takes the database's `-wal` and `-shm` with it, which is the part that is easy to get
+wrong by hand:
+
+```sh
+pubkit drop --language E
+pubkit drop --language E --cache --yes
+```
+
+### `config`
+
+Every setting in effect and what decided it:
+
+```sh
+pubkit config
+```
+
 ### `completion` and `version`
 
 ```sh

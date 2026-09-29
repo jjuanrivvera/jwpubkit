@@ -39,6 +39,13 @@ A flag beats an environment variable, which beats the file, which beats the defa
 				{"library", a.libDir, a.origin(cmd, "library")},
 				{"media_dir", a.defaultMediaDir(), a.mediaOrigin()},
 			}
+			// Naming the database file matters: it is per language, and someone
+			// reasoning about a file the tool never showed them is how a full
+			// library got mistaken for an empty one.
+			if st, err := a.store(); err == nil {
+				rows = append(rows, struct{ name, value, from string }{
+					"database", st.Path, "derived from library and language"})
+			}
 			if a.jsonOut {
 				out := map[string]any{"config_file": path, "config_file_read": a.cfg.Path != ""}
 				for _, r := range rows {

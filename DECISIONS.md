@@ -53,6 +53,22 @@ make a choice stick.
 The lesson for testing, too: the verification that missed this ran `export JWPUBKIT_LANG=S`
 in the same command as the check, which guaranteed the result it was supposed to be testing.
 
+## Removing a library is a command, because doing it by hand is a trap
+
+SQLite in WAL mode keeps recently written content in the `-wal` file beside the database. A
+library that has just indexed a Bible can therefore show a 4 KB `.db` next to a 46 MB `-wal`:
+`ls -l` makes a full library look empty. That is not a hypothetical — a 780-document Bible was
+deleted on exactly that reasoning, and removing only the `.db` left the `-wal` behind to be
+replayed onto the next database created in its place.
+
+So `pubkit drop` exists: it counts the publications, names the three files, reports without
+`--yes`, closes the handle before touching anything, and removes the database with its `-wal`
+and `-shm` together. The shared `.jwpub` cache is kept unless `--cache` asks for it, since
+re-indexing from it needs no network.
+
+`Store.Size()` counts all three files and `pubkit config` prints the database path, because
+half of that mistake was reasoning about a file the tool never showed anyone.
+
 ## One database per language, not one table with a language column
 
 A MEPS document id is the same number in every language: the English and the Spanish edition of
