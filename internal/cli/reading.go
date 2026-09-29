@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/jjuanrivvera/jwpubkit/internal/content"
+	"github.com/jjuanrivvera/jwpubkit/internal/subs"
 )
 
 // readingTimeCmd estimates how long something takes to read aloud: a document,
@@ -50,7 +51,7 @@ both can be overridden.`,
 			words, dense := content.CountUnits(text)
 			if a.jsonOut {
 				return a.printJSON(map[string]any{
-					"source": source, "seconds": int(d.Seconds()), "readable": ms(d),
+					"source": source, "seconds": int(d.Seconds()), "readable": subs.FormatTS(d),
 					"words": words, "characters_in_dense_scripts": dense,
 					"words_per_minute": rateOr(wpm, content.DefaultRate.WordsPerMinute),
 					"chars_per_minute": rateOr(cpm, content.DefaultRate.CharsPerMinute),
@@ -58,7 +59,7 @@ both can be overridden.`,
 				})
 			}
 			a.printf("%s\n", source)
-			a.printf("  about %s read aloud (an estimate)\n", ms(d))
+			a.printf("  about %s read aloud (an estimate)\n", subs.FormatTS(d))
 			if words > 0 {
 				a.printf("  %d words\n", words)
 			}
