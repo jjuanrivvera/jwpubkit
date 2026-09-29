@@ -8,4 +8,8 @@ on:
 jobs:
   release:
     uses: jjuanrivvera/.github/.github/workflows/go-release.yml@main
+    with:
+      # git-flow: las etiquetas salen de develop, y esto deja main apuntando a lo
+      # que se publicó en vez de quedarse atrás.
+      promote-main: true
     secrets: inherit
