@@ -135,7 +135,7 @@ func (a *app) store() (*store.Store, error) {
 	if a.st != nil {
 		return a.st, nil
 	}
-	st, err := store.Open(a.libDir)
+	st, err := store.Open(a.libDir, a.lang)
 	if err != nil {
 		return nil, fmt.Errorf("opening the library %s: %w", a.libDir, err)
 	}

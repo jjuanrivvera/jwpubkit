@@ -38,6 +38,20 @@ Parsing accepts every known language at once while display follows `--language`:
 pasted from a Spanish article still resolves while reading an English library, and the two
 spellings mean the same verse either way.
 
+## One database per language, not one table with a language column
+
+A MEPS document id is the same number in every language: the English and the Spanish edition of
+a publication share it. With `doc.docid` as the primary key, syncing the second language
+silently left the first with zero documents — measured, not theorised.
+
+The fix is a database file per language rather than a composite key. A composite key would work
+only as long as every query remembers to scope by language, forever; that is precisely the
+mistake that produced the bug. Separate files make the collision impossible instead of
+forbidden, cost nothing on disk (the `.jwpub` cache stays shared), and need no migration: the
+pre-language `jwlib.db` keeps serving the language it already holds, and any other language
+opens `jwlib.<lang>.db`. A library created from now on always uses the per-language name, so
+nothing downstream has to guess what a file contains.
+
 ## The meeting parser is language-bound, and says so
 
 `internal/meeting` finds the parts of a week by matching the words the workbook uses, so it

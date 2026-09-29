@@ -99,7 +99,7 @@ func TestBuildWeekSynthetic(t *testing.T) {
 	bible.UseLanguage("S")
 	t.Cleanup(func() { bible.UseLanguage(bible.DefaultLang) })
 
-	st, err := store.Open(t.TempDir())
+	st, err := store.Open(t.TempDir(), "S")
 	if err != nil {
 		t.Fatal(err)
 	}

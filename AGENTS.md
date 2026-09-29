@@ -45,7 +45,10 @@ The Spanish command and flag names the CLI shipped with are kept as aliases
 - `internal/cdn` — downloads from the jw.org CDN and the publication catalogue.
 - `internal/jwpub` — the format: a zip inside a zip, SQLite inside that, and the AES-128-CBC +
   zlib decryption of each document's content.
-- `internal/store` — the library: SQLite schema, the FTS5 index and the queries.
+- `internal/store` — the library: SQLite schema, the FTS5 index and the queries. **One database
+  file per language** (`jwlib.<lang>.db`, or `jwlib.db` for a library that predates this),
+  because MEPS document ids are shared across languages and would otherwise collide. The
+  `.jwpub` cache under `pubs/` is shared: its filenames already carry the language.
 - `internal/content` — publication HTML to text, markdown or JSON.
 - `internal/bible` — Bible references: parsing, ranges, book names and verse numbering.
 - `internal/meeting` — assembles the week's meeting from the indexed documents.

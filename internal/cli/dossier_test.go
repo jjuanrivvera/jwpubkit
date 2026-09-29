@@ -113,7 +113,7 @@ func seedChapterFixture(t *testing.T, st *store.Store) {
 }
 
 func TestBuildChapterDossier(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.Open(t.TempDir(), "S")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestBuildChapterDossier(t *testing.T) {
 }
 
 func TestBuildChapterDossierMissingBible(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.Open(t.TempDir(), "S")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestBuildChapterDossierMissingBible(t *testing.T) {
 }
 
 func TestBuildChapterDossierNoItSynced(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := store.Open(t.TempDir(), "S")
 	if err != nil {
 		t.Fatal(err)
 	}

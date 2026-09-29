@@ -20,8 +20,12 @@ const SchemaVersion = "3"
 
 // Store is an open library.
 type Store struct {
-	DB  *sql.DB
+	DB *sql.DB
+	// Dir is the library directory, shared by every language.
 	Dir string
+	// Lang is the language this handle holds; Path is the file it holds it in.
+	Lang string
+	Path string
 }
 
 // DefaultDir is $JWPUBKIT_HOME, else $JWLIB_HOME, else $XDG_DATA_HOME/jwlib, else
@@ -46,19 +50,63 @@ func DefaultDir() string {
 // PubsDir holds the downloaded .jwpub files.
 func (s *Store) PubsDir() string { return filepath.Join(s.Dir, "pubs") }
 
-// Open opens (and creates or migrates) the library in dir.
-func Open(dir string) (*Store, error) {
+// legacyDB is the single-language database the library used before it could hold
+// more than one language. It keeps serving whichever language it already holds.
+const legacyDB = "jwlib.db"
+
+// dbFile picks the database for a language. Each language gets its own file
+// because a MEPS document id is THE SAME NUMBER in every language: one shared
+// table would have every edition of a publication overwriting the previous one,
+// and no amount of remembering to filter by language in each query would make
+// that safe. Separate files make the collision impossible instead of forbidden.
+func dbFile(dir, lang string) string {
+	legacy := filepath.Join(dir, legacyDB)
+	if lang == "" {
+		return legacy
+	}
+	switch held, err := languageOf(legacy); {
+	case err != nil: // no legacy database: this language starts its own
+	case held == "": // an empty legacy database is claimed by whoever opens it first
+		return legacy
+	case held == lang:
+		return legacy
+	}
+	return filepath.Join(dir, "jwlib."+lang+".db")
+}
+
+// languageOf reports which language an existing database holds, or "" when it
+// holds nothing yet. It returns an error when there is no database at all.
+func languageOf(path string) (string, error) {
+	if _, err := os.Stat(path); err != nil {
+		return "", err
+	}
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro&_pragma=busy_timeout(3000)")
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+	var lang string
+	// More than one language in one file can only be a library written before
+	// they were separated; the first one wins, and the rest move to their own.
+	if err := db.QueryRow(`SELECT lang FROM pub GROUP BY lang ORDER BY count(*) DESC LIMIT 1`).Scan(&lang); err != nil {
+		return "", nil
+	}
+	return lang, nil
+}
+
+// Open opens (and creates or migrates) the library in dir for one language.
+func Open(dir, lang string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "pubs"), 0o755); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(dir, "jwlib.db")
+	path := dbFile(dir, lang)
 	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=temp_store(MEMORY)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{DB: db, Dir: dir}
+	s := &Store{DB: db, Dir: dir, Lang: lang, Path: path}
 	if err := s.migrate(); err != nil {
 		db.Close()
 		return nil, err
