@@ -19,17 +19,18 @@ import (
 
 // Block kinds.
 const (
-	KindHeading  = "h"       // Level says which
-	KindPara     = "p"       // body paragraph
-	KindItem     = "li"      // list item
-	KindQuestion = "q"       // study question (p.qu)
-	KindTheme    = "theme"   // theme scripture (p.themeScrp)
-	KindContext  = "context" // p.contextTtl: date or chapter label above the title
-	KindMeta     = "meta"    // p.pubRefs: song line, "TEMA" label
-	KindCaption  = "caption" // figcaption paragraph
-	KindCredit   = "credit"  // image credit line
-	KindFootnote = "fn"      // footnote body
-	KindOther    = "other"
+	KindHeading    = "h"       // Level says which
+	KindPara       = "p"       // body paragraph
+	KindItem       = "li"      // list item
+	KindQuestion   = "q"       // study question (p.qu)
+	KindTheme      = "theme"   // theme scripture (p.themeScrp)
+	KindContext    = "context" // p.contextTtl: date or chapter label above the title
+	KindMeta       = "meta"    // p.pubRefs: song line, "TEMA" label
+	KindCaption    = "caption" // figcaption paragraph
+	KindCredit     = "credit"  // image credit line
+	KindFootnote   = "fn"      // footnote body
+	KindDefinition = "def"     // a glossary entry: Term is the word, Text the definition
+	KindOther      = "other"
 )
 
 // Link is an anchor inside a block.
@@ -89,15 +90,19 @@ type Block struct {
 	// a section heading ("gem", "wheat", "sheep", "music"). It is the same in
 	// every language, which is what lets a section be recognized without reading
 	// the words in it.
-	Marker   string
-	NumLabel string // "3, 4" for questions that cover two paragraphs
-	FnLabel  string // footnote letter
-	RelPID   int    // question this paragraph answers (data-rel-pid)
-	Answer   bool   // followed by an answer box: the text is a prompt
-	InBox    bool   // inside a box / aside
-	Runs     []Run
-	Links    []*Link
-	Videos   []VideoRef
+	Marker string
+	// Term is set on a glossary entry: the word being defined, taken from the
+	// untranslated markup that marks it, with Text carrying the definition.
+	Term       string
+	definition string
+	NumLabel   string // "3, 4" for questions that cover two paragraphs
+	FnLabel    string // footnote letter
+	RelPID     int    // question this paragraph answers (data-rel-pid)
+	Answer     bool   // followed by an answer box: the text is a prompt
+	InBox      bool   // inside a box / aside
+	Runs       []Run
+	Links      []*Link
+	Videos     []VideoRef
 }
 
 // Item keeps blocks and figures in document order.
@@ -313,6 +318,15 @@ func (p *parser) walk(n *html.Node, st style) {
 
 	pid, _ := strconv.Atoi(pidStr)
 	b := &Block{PID: pid, Kind: blockKind(n, st), InBox: st.inBox, Marker: st.marker}
+	// A glossary entry puts its id on the list item, so the term and its
+	// definition would otherwise become one block, with the whole definition
+	// swallowed by the heading. The classes that mark them (de, dt, dd) are
+	// structural and untranslated — verified in Spanish and Japanese — so the
+	// two can be told apart without reading either.
+	if term := definitionTerm(n); term != "" {
+		b.Term, b.definition = term, definitionBody(n)
+		b.Kind = KindDefinition
+	}
 	if cls := strings.Fields(attr(n, "class")); len(cls) > 0 {
 		b.Class = cls[0]
 		b.Classes = cls
@@ -398,6 +412,50 @@ func headingLevel(n *html.Node) int {
 		return 4
 	}
 	return 0
+}
+
+// definitionTerm returns the word a definition-list entry defines, or "" when
+// this element is not one.
+func definitionTerm(n *html.Node) string {
+	if !hasClass(n, "de") {
+		return ""
+	}
+	var term string
+	var walk func(*html.Node)
+	walk = func(x *html.Node) {
+		if term != "" {
+			return
+		}
+		if hasClass(x, "dt") {
+			term = strings.TrimSpace(textOf(x))
+			return
+		}
+		for c := x.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+	return term
+}
+
+// definitionBody returns the text of a definition-list entry without its term.
+func definitionBody(n *html.Node) string {
+	var body string
+	var walk func(*html.Node)
+	walk = func(x *html.Node) {
+		if body != "" {
+			return
+		}
+		if hasClass(x, "dd") {
+			body = strings.TrimSpace(textOf(x))
+			return
+		}
+		for c := x.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+	return body
 }
 
 func blockKind(n *html.Node, st style) string {
@@ -644,6 +702,11 @@ func collapse(s string) string {
 
 // Text is the plain text of the block, without footnote calls.
 func (b *Block) Text() string {
+	// A glossary entry's text is its definition. The term is in Term, and
+	// repeating it here would put the word twice in every rendering.
+	if b.Kind == KindDefinition && b.definition != "" {
+		return collapse(b.definition)
+	}
 	var sb strings.Builder
 	for _, r := range b.Runs {
 		sb.WriteString(r.Text)

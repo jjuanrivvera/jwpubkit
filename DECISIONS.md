@@ -66,6 +66,34 @@ The lookup itself should move to the encyclopedia's own topic table (6 444 alias
 present in every language it is published in) rather than exact title matching. That is a
 separate, additive piece of work.
 
+## A library holds several Bibles, and reads name the one they want
+
+A study edition and a plain edition carry the same BibleVerseId for every verse, and the
+glossary of terms only ships with the plain one — so holding both is the ordinary case. With
+the verse id as the primary key, indexing the second Bible silently took over the first one's
+verses: measured on a live library, where a study edition became a plain one without a word,
+losing the study notes' companion text.
+
+Verses are therefore keyed per publication, and every read names its Bible. Which one? The one
+that can answer most, which is the one with study notes; failing that, the one with the most
+verses. It is cached per handle because it is asked on every call.
+
+That change touches one table, so it migrates on its own (`migrateVerses`) rather than through
+the schema version: bumping the version drops every indexed publication and would have cost a
+full re-sync of a 1.3 GB library for a change to one table. The Bible comes back with the next
+sync, which reads the cached `.jwpub` and needs no network.
+
+## One connection means a query inside a row loop deadlocks
+
+The pool is deliberately one connection (SQLite, single writer). Resolving a glossary term
+while iterating the study-note rows therefore asks for a connection the loop is itself holding,
+and waits forever. It does not look like a deadlock from outside — it looks like a hang, and it
+survived four rounds of guessing at slow SQL before a goroutine dump named the line in seconds.
+
+The links are read during the loop and resolved after the rows are closed. The fixtures that
+would have caught it all left the note HTML empty, so nothing exercised the read at all; there
+is now a test with a real note body in it.
+
 ## Study notes point at a dictionary by document id, so the pointer is followed, not read
 
 A note that says "see Glossary, X" expresses it as `<a class="xt" href="jwpub://p/<LANG>:<id>/">`.
@@ -74,9 +102,11 @@ reference is resolved by following the link. The entries themselves are publishe
 than inside any JWPUB, so what is given is the identifier and the address — correct everywhere —
 rather than a definition the library does not hold.
 
-Matching the term text against another publication's glossary would cover about half of them,
-and a miss would be indistinguishable from "no such term". Half an answer that cannot say it is
-half is worse than an address.
+A Bible in the library carries a glossary of its own (`Document.Class` 116, verified identical
+in Spanish and Japanese; the entries are marked by the untranslated `de`/`dt`/`dd` classes). It
+is indexed at sync time, so where it defines the term the reader gets the meaning offline. It
+does not cover every term the dictionary has, and a term it cannot define shows the address
+rather than something adjacent: an empty definition means "not held", never "no such term".
 
 ## Addresses use jw.org's finder, not a wol path
 

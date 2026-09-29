@@ -71,6 +71,10 @@ func (d *Doc) Markdown(opt RenderOptions) string {
 		}
 		var line string
 		switch b.Kind {
+		case KindDefinition:
+			// The term leads, the definition follows it: putting the whole
+			// definition inside a heading is what this used to do.
+			line = "**" + b.Term + "** — " + body
 		case KindCaption, KindCredit:
 			continue // printed with the image
 		case KindHeading:

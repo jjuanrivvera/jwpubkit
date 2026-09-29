@@ -26,6 +26,9 @@ type Store struct {
 	// Lang is the language this handle holds; Path is the file it holds it in.
 	Lang string
 	Path string
+
+	// bibleID caches which of the library's Bibles verses are read from.
+	bibleID int64
 }
 
 // DefaultDir is $JWPUBKIT_HOME, else $JWLIB_HOME, else $XDG_DATA_HOME/jwlib, else
@@ -115,6 +118,51 @@ func Open(dir, lang string) (*Store, error) {
 	return s, nil
 }
 
+// migrateVerses rebuilds the verse table when it still uses the old layout, in
+// which the BibleVerseId was the primary key and a second Bible therefore
+// overwrote the first. Nothing is lost that cannot be rebuilt: the verses come
+// back with the next sync of a Bible, which reads the cached .jwpub and needs
+// no network.
+func (s *Store) migrateVerses() error {
+	rows, err := s.DB.Query(`PRAGMA table_info(verse)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	existed, keyed := false, false
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt any
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		existed = true
+		if name == "row_id" {
+			keyed = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if keyed {
+		return nil
+	}
+	if existed {
+		for _, q := range []string{
+			`DROP TRIGGER IF EXISTS verse_ai`, `DROP TRIGGER IF EXISTS verse_ad`,
+			`DROP TABLE IF EXISTS verse_fts`, `DROP TABLE IF EXISTS verse`,
+		} {
+			if _, err := s.DB.Exec(q); err != nil {
+				return err
+			}
+		}
+	}
+	_, err = s.DB.Exec(verseSchema)
+	return err
+}
+
 // teachBookNames hands the bible package every language this library has seen a
 // Bible in, so references parse and print in the language of the publications
 // actually on disk. A library with no Bible simply leaves the built-in names.
@@ -169,6 +217,13 @@ func (s *Store) migrate() error {
 	if _, err := s.DB.Exec(`CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT)`); err != nil {
 		return err
 	}
+	// A Bible that predates verses being keyed per publication has to be rebuilt,
+	// but only it: bumping the schema version would drop every indexed
+	// publication in the library and cost the user a full re-sync for a change
+	// that touches one table.
+	if err := s.migrateVerses(); err != nil {
+		return err
+	}
 	// Tables that can simply be added never justify a rebuild: a schema bump drops
 	// the indexed content, and re-indexing a full library costs minutes the user
 	// did not ask for. They are created on every open and fill up on the next sync.
@@ -198,6 +253,16 @@ func (s *Store) migrate() error {
 
 // additiveSchema holds tables that are safe to create on an existing library.
 const additiveSchema = `
+-- The entries of any glossary the library holds, so a study note's "see
+-- Glossary, X" can be answered offline when the publication carrying it is
+-- synced. The term is stored folded for lookup and as published for display.
+CREATE TABLE IF NOT EXISTS glossary(
+	pub_id INTEGER NOT NULL, docid INTEGER NOT NULL, pid INTEGER NOT NULL,
+	key TEXT NOT NULL, term TEXT NOT NULL, text TEXT NOT NULL,
+	PRIMARY KEY(pub_id, docid, pid, key)
+);
+CREATE INDEX IF NOT EXISTS glossary_key ON glossary(key);
+
 -- Every subtitle cue of every transcript ever fetched, with the millisecond it
 -- starts at, so a phrase can be found in a video and opened at the right second.
 CREATE TABLE IF NOT EXISTS cue(
@@ -222,7 +287,36 @@ CREATE TABLE IF NOT EXISTS book_name(
 );
 `
 
-const schema = `
+// verseSchema is kept apart so the verse table can be rebuilt on its own: it is
+// the one table whose layout changed after libraries existed in the wild.
+const verseSchema = `
+-- A library can hold more than one Bible — a study edition and a plain one, and
+-- the glossary only ships with the plain one. They share BibleVerseId, so that
+-- id cannot be the primary key: the second Bible indexed would silently take
+-- over the first one's verses, which is exactly what happened. Each row is
+-- therefore keyed by its own rowid, unique per (verse, publication), and reads
+-- name the Bible they want.
+CREATE TABLE IF NOT EXISTS verse(
+	row_id INTEGER PRIMARY KEY,
+	id INTEGER NOT NULL,               -- BibleVerseId
+	book INTEGER NOT NULL, chapter INTEGER NOT NULL, verse INTEGER NOT NULL,
+	text TEXT NOT NULL,
+	pub_id INTEGER NOT NULL,
+	UNIQUE(id, pub_id)
+);
+CREATE INDEX IF NOT EXISTS verse_bcv ON verse(book, chapter, verse);
+CREATE INDEX IF NOT EXISTS verse_pub ON verse(pub_id, id);
+CREATE VIRTUAL TABLE IF NOT EXISTS verse_fts USING fts5(
+	text, content='verse', content_rowid='row_id', tokenize='unicode61 remove_diacritics 2');
+CREATE TRIGGER IF NOT EXISTS verse_ai AFTER INSERT ON verse BEGIN
+	INSERT INTO verse_fts(rowid, text) VALUES (new.row_id, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS verse_ad AFTER DELETE ON verse BEGIN
+	INSERT INTO verse_fts(verse_fts, rowid, text) VALUES ('delete', old.row_id, old.text);
+END;
+`
+
+const schema = verseSchema + `
 CREATE TABLE IF NOT EXISTS pub(
 	id INTEGER PRIMARY KEY,
 	key TEXT NOT NULL UNIQUE,          -- mwb_S_202609, nwtsty_S
@@ -255,15 +349,6 @@ CREATE TABLE IF NOT EXISTS par(
 CREATE INDEX IF NOT EXISTS par_doc ON par(docid, pid);
 CREATE VIRTUAL TABLE IF NOT EXISTS par_fts USING fts5(
 	text, content='par', content_rowid='id', tokenize='unicode61 remove_diacritics 2');
-CREATE TABLE IF NOT EXISTS verse(
-	id INTEGER PRIMARY KEY,            -- BibleVerseId
-	book INTEGER NOT NULL, chapter INTEGER NOT NULL, verse INTEGER NOT NULL,
-	text TEXT NOT NULL,
-	pub_id INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS verse_bcv ON verse(book, chapter, verse);
-CREATE VIRTUAL TABLE IF NOT EXISTS verse_fts USING fts5(
-	text, content='verse', content_rowid='id', tokenize='unicode61 remove_diacritics 2');
 CREATE TABLE IF NOT EXISTS verse_note(      -- study notes (VerseCommentary)
 	verse_id INTEGER NOT NULL, seq INTEGER NOT NULL,
 	label TEXT, text TEXT NOT NULL, html TEXT NOT NULL, docid INTEGER, pub_id INTEGER NOT NULL
@@ -316,12 +401,6 @@ CREATE TRIGGER IF NOT EXISTS par_ai AFTER INSERT ON par BEGIN
 END;
 CREATE TRIGGER IF NOT EXISTS par_ad AFTER DELETE ON par BEGIN
 	INSERT INTO par_fts(par_fts, rowid, text) VALUES ('delete', old.id, old.text);
-END;
-CREATE TRIGGER IF NOT EXISTS verse_ai AFTER INSERT ON verse BEGIN
-	INSERT INTO verse_fts(rowid, text) VALUES (new.id, new.text);
-END;
-CREATE TRIGGER IF NOT EXISTS verse_ad AFTER DELETE ON verse BEGIN
-	INSERT INTO verse_fts(verse_fts, rowid, text) VALUES ('delete', old.id, old.text);
 END;
 CREATE TABLE IF NOT EXISTS video(
 	key TEXT NOT NULL, lang TEXT NOT NULL, title TEXT, duration REAL, subtitles TEXT,

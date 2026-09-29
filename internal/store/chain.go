@@ -111,7 +111,7 @@ func (s *Store) xrefTargets(from []int) ([]xrefTarget, error) {
 
 func (s *Store) verseAt(id int) (ChainStep, error) {
 	var v ChainStep
-	err := s.DB.QueryRow(`SELECT id, book, chapter, verse, text FROM verse WHERE id=?`, id).
-		Scan(&v.VerseID, &v.Book, &v.Chapter, &v.Verse, &v.Text)
+	err := s.DB.QueryRow(`SELECT id, book, chapter, verse, text FROM verse WHERE id=? AND pub_id=?`,
+		id, s.BibleID()).Scan(&v.VerseID, &v.Book, &v.Chapter, &v.Verse, &v.Text)
 	return v, err
 }

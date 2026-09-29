@@ -211,6 +211,10 @@ func (a *app) printVerses(res verseResult, ranges []bible.Range) {
 		for _, n := range v.Notes {
 			notes = append(notes, fmt.Sprintf("  %s %s", n.Label, n.Text))
 			for _, d := range n.Defines {
+				if d.Text != "" {
+					notes = append(notes, fmt.Sprintf("      %s: %s", d.Term, d.Text))
+					continue
+				}
 				notes = append(notes, fmt.Sprintf("      %s → %s", d.Term, d.URL))
 			}
 		}

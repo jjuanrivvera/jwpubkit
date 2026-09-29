@@ -247,6 +247,11 @@ func (ix *indexer) documents() error {
 		if htmlText == "" {
 			continue
 		}
+		if class.Int64 == glossaryClass {
+			if err := ix.indexGlossary(docid, htmlText); err != nil {
+				return err
+			}
+		}
 		parsed, err := content.Parse(htmlText)
 		if err != nil {
 			return fmt.Errorf("document %d: %w", docid, err)

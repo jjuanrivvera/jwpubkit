@@ -307,7 +307,8 @@ func (s *Store) SearchVerses(query string, limit int) ([]VerseHit, error) {
 		return nil, errors.New("the query is empty")
 	}
 	rows, err := s.DB.Query(`SELECT verse.id, verse.book, verse.chapter, verse.verse, snippet(verse_fts, 0, '«', '»', '…', 24)
-		FROM verse_fts JOIN verse ON verse.id = verse_fts.rowid WHERE verse_fts MATCH ? ORDER BY verse.id LIMIT ?`, fq, limit)
+		FROM verse_fts JOIN verse ON verse.row_id = verse_fts.rowid
+		WHERE verse_fts MATCH ? AND verse.pub_id = ? ORDER BY verse.id LIMIT ?`, fq, s.BibleID(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -361,18 +362,50 @@ type StudyNote struct {
 	Defines []Definition `json:"defines,omitempty"`
 }
 
-// Definition is a term a study note points at, with where to read it.
+// Definition is a term a study note points at, with where to read it and, when
+// the library holds a glossary that defines it, what it means.
 type Definition struct {
 	Term  string `json:"term"`
 	DocID int    `json:"docid"`
 	URL   string `json:"url"`
+	// Text is the definition, empty when no glossary in the library defines this
+	// term. Empty means "not held", never "no such term".
+	Text string `json:"definition,omitempty"`
+	// From is the document the definition was read out of.
+	From int `json:"definition_docid,omitempty"`
 }
 
 // HasBible reports whether a Bible with verse text is synced.
 func (s *Store) HasBible() bool {
-	var n int
-	s.DB.QueryRow(`SELECT count(*) FROM verse`).Scan(&n)
-	return n > 0
+	return s.BibleID() != 0
+}
+
+// bibleID caches the publication reads take their verses from.
+var _ = 0
+
+// BibleID is the Bible the library reads from when it holds more than one.
+//
+// A study edition and a plain edition carry the same verses; what separates them
+// is the study notes, which is also what makes one of them the better answer to
+// every question this tool is asked. So the Bible with the most study notes wins,
+// and where none has any, the one with the most verses.
+func (s *Store) BibleID() int64 {
+	if s.bibleID != 0 {
+		return s.bibleID
+	}
+	// Counted with subqueries rather than a join: joining verses to notes on the
+	// publication multiplies 31 000 verses by 3 500 notes before grouping, which
+	// turned a startup question into a minutes-long one.
+	var id int64
+	err := s.DB.QueryRow(`SELECT pub_id,
+			(SELECT count(*) FROM verse_note n WHERE n.pub_id = v.pub_id) AS notes,
+			count(*) AS verses
+		FROM verse v GROUP BY pub_id ORDER BY notes DESC, verses DESC LIMIT 1`).Scan(&id, new(int), new(int))
+	if err != nil {
+		return 0
+	}
+	s.bibleID = id
+	return id
 }
 
 // BibleTitle is the name the synced Bible gives itself, which is the only
@@ -380,15 +413,15 @@ func (s *Store) HasBible() bool {
 // translation's name in one language when the library may hold any of them.
 func (s *Store) BibleTitle() string {
 	var title string
-	s.DB.QueryRow(`SELECT COALESCE(p.title, '') FROM pub p
-		JOIN verse v ON v.pub_id = p.id GROUP BY p.id ORDER BY count(*) DESC LIMIT 1`).Scan(&title)
+	s.DB.QueryRow(`SELECT COALESCE(title, '') FROM pub WHERE id = ?`, s.BibleID()).Scan(&title)
 	return title
 }
 
 // Verses loads verses first..last (BibleVerseId) with footnotes, marginal
 // references and study notes.
 func (s *Store) Verses(first, last int) ([]Verse, error) {
-	rows, err := s.DB.Query(`SELECT id, book, chapter, verse, text FROM verse WHERE id BETWEEN ? AND ? ORDER BY id`, first, last)
+	rows, err := s.DB.Query(`SELECT id, book, chapter, verse, text FROM verse
+		WHERE id BETWEEN ? AND ? AND pub_id = ? ORDER BY id`, first, last, s.BibleID())
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +489,6 @@ func (s *Store) Verses(first, last int) ([]Verse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer nrows.Close()
 	for nrows.Next() {
 		var id int
 		var n StudyNote
@@ -464,12 +496,37 @@ func (s *Store) Verses(first, last int) ([]Verse, error) {
 		if err := nrows.Scan(&id, &n.Label, &n.Text, &n.DocID, &html); err != nil {
 			return nil, err
 		}
+		// Only the links are read here. Resolving them needs another query, and
+		// the pool holds a single connection: asking for one while these rows are
+		// open waits on a connection this loop is itself holding. It looks like a
+		// hang, and the stack says `database/sql` waiting for a free connection.
 		n.Defines = definitionsIn(html)
 		if i, ok := idx[id]; ok {
 			out[i].Notes = append(out[i].Notes, n)
 		}
 	}
-	return out, nrows.Err()
+	if err := nrows.Err(); err != nil {
+		nrows.Close()
+		return nil, err
+	}
+	nrows.Close()
+
+	// The rows are closed, so the one connection is free: now the terms the notes
+	// point at can be looked up in whatever glossary the library holds.
+	for i := range out {
+		for j := range out[i].Notes {
+			out[i].Notes[j].Defines = s.defineAll(out[i].Notes[j].Defines)
+		}
+	}
+
+	// The rows are closed, so the single connection is free: now the terms the
+	// notes point at can be looked up in whatever glossary the library holds.
+	for i := range out {
+		for j := range out[i].Notes {
+			out[i].Notes[j].Defines = s.defineAll(out[i].Notes[j].Defines)
+		}
+	}
+	return out, nil
 }
 
 // Citation is a document that cites a verse.
@@ -756,6 +813,20 @@ func (s *Store) PutVideo(key, lang, title string, duration float64, subtitles st
 var dictLinkRe = regexp.MustCompile(`<a[^>]*class="xt"[^>]*href="jwpub://p/[A-Za-z]+:(\d+)/?"[^>]*>(.*?)</a>`)
 
 var tagRe = regexp.MustCompile(`<[^>]+>`)
+
+// defineAll fills in the definitions the library can supply. The referenced
+// dictionary is published online rather than inside a JWPUB, but a Bible in the
+// library carries a glossary of its own, and where the two agree on a term the
+// reader gets the meaning without leaving the machine. Where they do not, the
+// address stands on its own.
+func (s *Store) defineAll(in []Definition) []Definition {
+	for i := range in {
+		if e, ok := s.Define(in[i].Term); ok {
+			in[i].Text, in[i].From = e.Text, e.DocID
+		}
+	}
+	return in
+}
 
 // definitionsIn pulls the dictionary entries a note points at. The entries
 // themselves are published online rather than inside any JWPUB, so what can be

@@ -65,6 +65,13 @@ library    …    built-in default
 A flag beats an environment variable (`JWPUBKIT_LANG`, `JWPUBKIT_HOME`, `JWPUBKIT_MEDIA_DIR`),
 which beats the file, which beats the default.
 
+## More than one Bible
+
+A library can hold a study edition and a plain one — they carry the same verses, but the
+glossary of terms ships only with the plain one. Reads come from the Bible that can answer
+most, which is the one with study notes. `pubkit config` prints which database file is in use;
+`pubkit drop` removes one language's library safely.
+
 Bible references are read and printed in the language of the Bible you synced: English and
 Spanish are built in, and every other language is learned from the Bible itself when it is
 indexed, so `pubkit verse` speaks whatever your library speaks.

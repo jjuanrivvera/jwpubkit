@@ -34,6 +34,7 @@ type blockOut struct {
 	Num      int      `json:"number,omitempty"`
 	NumLabel string   `json:"number_label,omitempty"`
 	Sub      int      `json:"subentry,omitempty"`
+	Term     string   `json:"term,omitempty"`
 	Text     string   `json:"text"`
 	Question bool     `json:"question,omitempty"`
 	Box      bool     `json:"box,omitempty"`
@@ -154,7 +155,7 @@ func (a *app) loadDoc(st *store.Store, docid int) (*docOut, *content.Doc, error)
 	}
 	seenBible := map[string]bool{}
 	for _, b := range parsed.Blocks {
-		bo := blockOut{PID: b.PID, Kind: b.Kind, Level: b.Level, Num: b.Num, NumLabel: b.NumLabel, Sub: b.Sub, Text: b.Text(),
+		bo := blockOut{PID: b.PID, Kind: b.Kind, Level: b.Level, Num: b.Num, NumLabel: b.NumLabel, Sub: b.Sub, Term: b.Term, Text: b.Text(),
 			Question: b.IsQuestion(), Box: b.InBox, RelPID: b.RelPID}
 		if bo.Text == "" {
 			continue
