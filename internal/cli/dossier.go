@@ -37,15 +37,15 @@ func tokenEstimate(s string) int { return (len([]rune(s)) + 3) / 4 }
 // chapter, deduplicated across verses.
 type citationOut struct {
 	DocID     int    `json:"docid"`
-	Pub       string `json:"publicacion"`
-	Title     string `json:"titulo"`
+	Pub       string `json:"publication"`
+	Title     string `json:"title"`
 	PID       int    `json:"pid"`
 	URL       string `json:"url"`
-	Year      int    `json:"anio,omitempty"`
-	Verses    []int  `json:"versiculos"`
-	Extract   string `json:"extracto"`
-	Trimmed   bool   `json:"extracto_recortado,omitempty"`
-	NoExtract bool   `json:"sin_extracto,omitempty"`
+	Year      int    `json:"year,omitempty"`
+	Verses    []int  `json:"verses"`
+	Extract   string `json:"extract"`
+	Trimmed   bool   `json:"extract_trimmed,omitempty"`
+	NoExtract bool   `json:"no_extract,omitempty"`
 }
 
 // imageOut is one image found on a document referenced by the chapter's
@@ -53,76 +53,75 @@ type citationOut struct {
 // the package doc comment on why CDN sizes are not compared here).
 type imageOut struct {
 	DocID   int    `json:"docid"`
-	Num     int    `json:"numero"`
-	File    string `json:"archivo"`
-	Caption string `json:"pie,omitempty"`
-	Width   int    `json:"ancho"`
-	Height  int    `json:"alto"`
+	Num     int    `json:"number"`
+	File    string `json:"file"`
+	Caption string `json:"caption,omitempty"`
+	Width   int    `json:"width"`
+	Height  int    `json:"height"`
 }
 
 // placeOut is a proper-noun candidate found in the chapter's study notes
 // and footnotes, cross-referenced against Perspicacia (it) by exact title.
 type placeOut struct {
-	Name    string `json:"nombre"`
+	Name    string `json:"name"`
 	ItDocID int    `json:"it_docid,omitempty"`
-	InIt    bool   `json:"en_it"`
+	InIt    bool   `json:"in_it"`
 }
 
 // chapterDossier is everything expediente gathers for one chapter.
 type chapterDossier struct {
-	Book        int           `json:"libro"`
-	Chapter     int           `json:"capitulo"`
-	Ref         string        `json:"referencia"`
-	Verses      []store.Verse `json:"versiculos"`
-	Citations   []citationOut `json:"citas"`
-	Images      []imageOut    `json:"imagenes"`
-	Places      []placeOut    `json:"lugares"`
-	NotInLib    []string      `json:"no_en_biblioteca"`
-	VerseCount  int           `json:"conteo_versiculos"`
-	CiteCount   int           `json:"conteo_citas"`
-	ImageCount  int           `json:"conteo_imagenes"`
-	PlaceCount  int           `json:"conteo_lugares"`
-	TokenEst    int           `json:"tokens_estimados"`
-	ExtractsCut bool          `json:"extractos_recortados,omitempty"`
-	File        string        `json:"archivo,omitempty"`
+	Book        int           `json:"book"`
+	Chapter     int           `json:"chapter"`
+	Ref         string        `json:"reference"`
+	Verses      []store.Verse `json:"verses"`
+	Citations   []citationOut `json:"citations"`
+	Images      []imageOut    `json:"images"`
+	Places      []placeOut    `json:"places"`
+	NotInLib    []string      `json:"not_in_library"`
+	VerseCount  int           `json:"verse_count"`
+	CiteCount   int           `json:"citation_count"`
+	ImageCount  int           `json:"image_count"`
+	PlaceCount  int           `json:"place_count"`
+	TokenEst    int           `json:"estimated_tokens"`
+	ExtractsCut bool          `json:"extracts_trimmed,omitempty"`
+	File        string        `json:"file,omitempty"`
 }
 
-type expedienteResult struct {
-	Ref       string            `json:"referencia"`
-	Salida    string            `json:"salida"`
-	Capitulos []*chapterDossier `json:"capitulos"`
+type dossierResult struct {
+	Ref      string            `json:"reference"`
+	OutDir   string            `json:"output_dir"`
+	Chapters []*chapterDossier `json:"chapters"`
 }
 
-func (a *app) expedienteCmd() *cobra.Command {
+func (a *app) dossierCmd() *cobra.Command {
 	var outDir string
 	cmd := &cobra.Command{
-		Use:     `expediente "<referencia-de-capítulos>"`,
-		Aliases: []string{"dossier"},
-		Short:   "Expediente por capítulo (texto, citas, imágenes, lugares) para que un agente lo lea una sola vez",
-		Long: `Arma, 100% desde la biblioteca local y sin llamar a ningún modelo, un expediente por
-CAPÍTULO pensado para que un agente que prepara un discurso o un video lo lea una sola
-vez, en vez de repasar wol.jw.org en muchas llamadas. Para cada capítulo del rango:
+		Use:     `dossier "<chapter-reference>"`,
+		Aliases: []string{"expediente"},
+		Short:   "A per-chapter dossier (text, citations, images, places) meant to be read once",
+		Long: `Builds, entirely from the local library and without calling any model, one dossier per
+CHAPTER — meant for an agent preparing a talk or a video to read once instead of
+walking a website across many calls. For every chapter in the range:
 
-  1. Texto TNM (edición de estudio), notas de estudio, notas al pie y referencias
-     marginales, con la misma fidelidad que "pubkit versiculo".
-  2. Los documentos de la biblioteca que citan cada versículo (tabla BibleCitation),
-     con el extracto del párrafo que cita, deduplicados por documento/párrafo y con
-     los versículos que citan cada uno. Se ordenan por cuántos versículos distintos
-     del capítulo citan y, a igualdad, por publicación más reciente.
-  3. Las imágenes de esos documentos citados, con el tamaño que trae la biblioteca
-     (sin bajar nada de la CDN).
-  4. Nombres propios de las notas y notas al pie del capítulo, cruzados con
-     Perspicacia (it) por título exacto si está sincronizada.
-  5. Un índice con los conteos y un aviso explícito de lo que no está en la
-     biblioteca (para que el agente sepa qué buscar afuera en vez de asumir que
-     no existe).
+  1. The Bible text with its study notes, footnotes and marginal references, as
+     faithfully as "pubkit verse" renders them.
+  2. The library documents that cite each verse (the BibleCitation table), with the
+     extract of the citing paragraph, deduplicated by document and paragraph and
+     carrying the verses each one cites. They are ordered by how many distinct verses
+     of the chapter they cite and, on a tie, by the most recent publication.
+  3. The images of those citing documents, at the size the library holds (nothing is
+     downloaded from the CDN here).
+  4. Proper nouns from the chapter's notes and footnotes, cross-referenced by exact
+     title against an encyclopedic publication (it) when it is synced.
+  5. An index with the counts and an explicit list of what is NOT in the library, so
+     the agent knows what to look for elsewhere instead of assuming it does not exist.
 
-Escribe un .md por capítulo y un .json con todos los capítulos en --salida (la carpeta
-actual por defecto). Cada .md trae, al final, una estimación de tokens (heurística
-caracteres/4); si un capítulo se pasa del presupuesto, se recortan los extractos de las
-citas (nunca se quitan versículos ni citas).`,
-		Example: `  pubkit expediente "Gén 37-41" --salida /tmp/expediente
-  pubkit expediente "Jer 38-39" --json | jq '.capitulos[].conteo_citas'`,
+Writes one .md per chapter and one .json with all of them into --output (the current
+directory by default). Each .md ends with a token estimate (the chars/4 heuristic);
+when a chapter goes over budget the citation extracts are trimmed — verses and
+citations are never dropped.`,
+		Example: `  pubkit dossier "Gen 37-41" --output /tmp/dossier
+  pubkit dossier "Jer 38-39" --json | jq '.chapters[].citation_count'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.store()
@@ -131,9 +130,9 @@ citas (nunca se quitan versículos ni citas).`,
 			}
 			if !st.HasBible() {
 				if a.offline {
-					return fmt.Errorf("la Biblia de estudio no está en la biblioteca: pubkit sync nwtsty")
+					return fmt.Errorf("no study Bible in the library: pubkit sync nwtsty")
 				}
-				a.logf("la Biblia de estudio (nwtsty, ~127 MB) no está en la biblioteca; sincronizando")
+				a.logf("no study Bible in the library (nwtsty, ~127 MB); syncing it")
 				if _, err := a.syncOne("nwtsty", "", false); err != nil {
 					return err
 				}
@@ -150,27 +149,27 @@ citas (nunca se quitan versículos ni citas).`,
 			}
 			hasIt := st.HasSymbol("it")
 			if !hasIt {
-				a.logf("Perspicacia (it) no está en la biblioteca; el cruce de lugares se omite")
+				a.logf("the encyclopedic publication (it) is not in the library; the place cross-reference is skipped")
 			}
-			res := &expedienteResult{Ref: bible.FormatList(chapters), Salida: outDir}
+			res := &dossierResult{Ref: bible.FormatList(chapters), OutDir: outDir}
 			for _, r := range chapters {
-				a.logf("armando el expediente de %s", r.Long())
+				a.logf("building the dossier for %s", r.Long())
 				d, err := a.buildChapterDossier(st, r, hasIt)
 				if err != nil {
 					return err
 				}
 				md := renderChapterDossier(d)
-				name := fmt.Sprintf("expediente_%s_%d.md", chapterSlug(r.Book), r.StartChapter)
+				name := fmt.Sprintf("dossier_%s_%d.md", chapterSlug(r.Book), r.StartChapter)
 				path := filepath.Join(outDir, name)
 				if err := os.WriteFile(path, []byte(md), 0o644); err != nil {
 					return err
 				}
 				d.File = path
-				res.Capitulos = append(res.Capitulos, d)
-				a.logf("%s · %d versículos · %d citas · %d imágenes · %d lugares · ~%d tokens → %s",
+				res.Chapters = append(res.Chapters, d)
+				a.logf("%s · %d verses · %d citations · %d images · %d places · ~%d tokens → %s",
 					r.Long(), d.VerseCount, d.CiteCount, d.ImageCount, d.PlaceCount, d.TokenEst, path)
 			}
-			jsonPath := filepath.Join(outDir, "expediente.json")
+			jsonPath := filepath.Join(outDir, "dossier.json")
 			jf, err := os.Create(jsonPath)
 			if err != nil {
 				return err
@@ -188,16 +187,16 @@ citas (nunca se quitan versículos ni citas).`,
 			if a.jsonOut {
 				return a.printJSON(res)
 			}
-			a.printf("Expediente de %s · %d capítulos · carpeta %s\n", res.Ref, len(res.Capitulos), outDir)
-			for _, d := range res.Capitulos {
-				a.printf("  %s · %d versículos · %d citas · %d imágenes · %d lugares · ~%d tokens · %s\n",
+			a.printf("Dossier for %s · %d chapters · directory %s\n", res.Ref, len(res.Chapters), outDir)
+			for _, d := range res.Chapters {
+				a.printf("  %s · %d verses · %d citations · %d images · %d places · ~%d tokens · %s\n",
 					d.Ref, d.VerseCount, d.CiteCount, d.ImageCount, d.PlaceCount, d.TokenEst, filepath.Base(d.File))
 			}
 			a.printf("  %s\n", jsonPath)
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&outDir, "salida", "o", "", "carpeta donde escribir los .md y el .json (por defecto la actual)")
+	cmd.Flags().StringVarP(&outDir, "output", "o", "", "directory for the .md files and the .json (default: the current one)")
 	return cmd
 }
 
@@ -221,7 +220,7 @@ func chapterRanges(ref string) ([]bible.Range, error) {
 			seen[key] = true
 			bk, ok := bible.BookByNum(r.Book)
 			if !ok {
-				return nil, fmt.Errorf("libro %d desconocido", r.Book)
+				return nil, fmt.Errorf("unknown book %d", r.Book)
 			}
 			crs, err := bible.Parse(fmt.Sprintf("%s %d", bk.Short, c))
 			if err != nil {
@@ -255,7 +254,7 @@ func (a *app) buildChapterDossier(st *store.Store, r bible.Range, hasIt bool) (*
 		return nil, err
 	}
 	if len(verses) == 0 {
-		return nil, fmt.Errorf("%s no está en la Biblia de la biblioteca", r.Long())
+		return nil, fmt.Errorf("%s is not in the library's Bible", r.Long())
 	}
 	for i := range verses {
 		for j := range verses[i].XRefs {
@@ -288,7 +287,7 @@ func (a *app) buildChapterDossier(st *store.Store, r bible.Range, hasIt bool) (*
 	if hasIt {
 		d.Places = a.chapterPlaces(st, verses)
 	} else {
-		d.NotInLib = append(d.NotInLib, "Perspicacia (it) no está sincronizada: no se cruzaron los lugares mencionados")
+		d.NotInLib = append(d.NotInLib, "the encyclopedic publication (it) is not synced: the places were not cross-referenced")
 	}
 	d.PlaceCount = len(d.Places)
 
@@ -298,7 +297,7 @@ func (a *app) buildChapterDossier(st *store.Store, r bible.Range, hasIt bool) (*
 				continue
 			}
 			if _, err := st.Doc(n.DocID); err != nil {
-				d.NotInLib = append(d.NotInLib, fmt.Sprintf("nota de estudio de %s referencia el docid %d, que no está sincronizado", verseLabel(v), n.DocID))
+				d.NotInLib = append(d.NotInLib, fmt.Sprintf("a study note on %s points at docid %d, which is not synced", verseLabel(v), n.DocID))
 			}
 		}
 	}
@@ -357,7 +356,7 @@ func (a *app) chapterCitations(st *store.Store, verses []store.Verse) ([]citatio
 			}
 			if text == "" {
 				e.NoExtract = true
-				missing = append(missing, fmt.Sprintf("docid %d pid %d: cita sin extracto indexado", k.docid, k.pid))
+				missing = append(missing, fmt.Sprintf("docid %d pid %d: the citation has no indexed extract", k.docid, k.pid))
 			}
 			e.Extract = text
 		} else {
@@ -379,7 +378,7 @@ func (a *app) chapterCitations(st *store.Store, verses []store.Verse) ([]citatio
 
 // chapterImages lists the images of the documents cited in the chapter, with
 // the width/height the library recorded when the JWPUB was indexed. No
-// network call: comparing against the CDN (as "pubkit imagen" does) would
+// network call: comparing against the CDN (as "pubkit image" does) would
 // need to download bytes, which expediente is built to avoid entirely.
 func (a *app) chapterImages(st *store.Store, cites []citationOut) ([]imageOut, []string) {
 	seenDocs := map[int]bool{}
@@ -392,7 +391,7 @@ func (a *app) chapterImages(st *store.Store, cites []citationOut) ([]imageOut, [
 		seenDocs[c.DocID] = true
 		media, err := st.MediaOf(c.DocID)
 		if err != nil {
-			missing = append(missing, fmt.Sprintf("docid %d: no se pudieron leer sus imágenes (%v)", c.DocID, err))
+			missing = append(missing, fmt.Sprintf("docid %d: its images could not be read (%v)", c.DocID, err))
 			continue
 		}
 		n := 0
@@ -512,7 +511,7 @@ func renderChapterDossier(d *chapterDossier) string {
 			break
 		}
 	}
-	return fmt.Sprintf("%s\n---\nEstimado de tokens de este archivo: ~%d (heurística: caracteres/4)\n", body, d.TokenEst)
+	return fmt.Sprintf("%s\n---\nEstimated tokens in this file: ~%d (heuristic: chars/4)\n", body, d.TokenEst)
 }
 
 // citationsExceed reports whether any citation extract is longer than limit
@@ -533,19 +532,19 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 	d.ExtractsCut = citationsExceed(d.Citations, extractCap)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "# Expediente: %s\n\n", d.Ref)
+	fmt.Fprintf(&b, "# Dossier: %s\n\n", d.Ref)
 
-	b.WriteString("## Índice\n\n")
-	fmt.Fprintf(&b, "- Versículos: %d\n", d.VerseCount)
-	fmt.Fprintf(&b, "- Citas encontradas: %d\n", d.CiteCount)
-	fmt.Fprintf(&b, "- Imágenes encontradas: %d\n", d.ImageCount)
-	fmt.Fprintf(&b, "- Lugares candidatos: %d\n", d.PlaceCount)
+	b.WriteString("## Index\n\n")
+	fmt.Fprintf(&b, "- Verses: %d\n", d.VerseCount)
+	fmt.Fprintf(&b, "- Citations found: %d\n", d.CiteCount)
+	fmt.Fprintf(&b, "- Images found: %d\n", d.ImageCount)
+	fmt.Fprintf(&b, "- Candidate places: %d\n", d.PlaceCount)
 	if d.ExtractsCut {
-		b.WriteString("- Extractos de citas recortados para caber en el presupuesto de tokens\n")
+		b.WriteString("- Citation extracts trimmed to fit the token budget\n")
 	}
-	b.WriteString("- NO en la biblioteca:")
+	b.WriteString("- NOT in the library:")
 	if len(d.NotInLib) == 0 {
-		b.WriteString(" (ninguno)\n")
+		b.WriteString(" (nothing)\n")
 	} else {
 		b.WriteString("\n")
 		for _, m := range d.NotInLib {
@@ -553,7 +552,7 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 		}
 	}
 
-	b.WriteString("\n## Texto (TNM, edición de estudio)\n\n")
+	b.WriteString("\n## Bible text\n\n")
 	for _, v := range d.Verses {
 		if v.Verse == 0 {
 			continue
@@ -577,7 +576,7 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 	section := func(title string, lines []string) {
 		b.WriteString("\n## " + title + "\n\n")
 		if len(lines) == 0 {
-			b.WriteString("(ninguna)\n")
+			b.WriteString("(none)\n")
 			return
 		}
 		for _, l := range lines {
@@ -588,22 +587,22 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 	section("Notas al pie", fns)
 	section("Referencias marginales", xrefs)
 
-	b.WriteString("\n## Citas en la biblioteca (ordenadas por relevancia)\n\n")
+	b.WriteString("\n## Citations in the library (most relevant first)\n\n")
 	if len(d.Citations) == 0 {
-		b.WriteString("(ninguna)\n")
+		b.WriteString("(none)\n")
 	}
 	for i, c := range d.Citations {
 		var vs []string
 		for _, v := range c.Verses {
 			vs = append(vs, fmt.Sprint(v))
 		}
-		fmt.Fprintf(&b, "%d. docid %d · %s · %s · versículos %s", i+1, c.DocID, c.Pub, c.Title, strings.Join(vs, ", "))
+		fmt.Fprintf(&b, "%d. docid %d · %s · %s · verses %s", i+1, c.DocID, c.Pub, c.Title, strings.Join(vs, ", "))
 		if c.Year > 0 {
 			fmt.Fprintf(&b, " · %d", c.Year)
 		}
 		b.WriteString("\n")
 		if c.NoExtract {
-			b.WriteString("   (sin extracto indexado)\n")
+			b.WriteString("   (no indexed extract)\n")
 			continue
 		}
 		extract := c.Extract
@@ -614,32 +613,32 @@ func renderChapterMD(d *chapterDossier, extractCap int) string {
 		}
 		fmt.Fprintf(&b, "   > %s\n", extract)
 		if cut {
-			b.WriteString("   (extracto recortado; texto completo: pubkit doc " + fmt.Sprint(c.DocID) + ")\n")
+			b.WriteString("   (extract trimmed; the whole text: pubkit doc " + fmt.Sprint(c.DocID) + ")\n")
 		}
 	}
 
-	b.WriteString("\n## Imágenes de los documentos citados\n\n")
+	b.WriteString("\n## Images of the citing documents\n\n")
 	if len(d.Images) == 0 {
-		b.WriteString("(ninguna)\n")
+		b.WriteString("(none)\n")
 	}
 	for _, im := range d.Images {
-		fmt.Fprintf(&b, "- docid %d imagen %d: %s · %d×%d", im.DocID, im.Num, im.File, im.Width, im.Height)
+		fmt.Fprintf(&b, "- docid %d image %d: %s · %d×%d", im.DocID, im.Num, im.File, im.Width, im.Height)
 		if im.Caption != "" {
 			fmt.Fprintf(&b, " · %s", im.Caption)
 		}
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n## Lugares mencionados (candidatos)\n\n")
-	b.WriteString("Heurística local: nombres propios de las notas de estudio y notas al pie, cruzados con Perspicacia (it) por título exacto. No es una clasificación geográfica real; conviene revisarlos.\n\n")
+	b.WriteString("\n## Places mentioned (candidates)\n\n")
+	b.WriteString("A local heuristic: proper nouns from the study notes and footnotes, cross-referenced by exact title against the encyclopedic publication (it). It is not real geographic classification, so check them.\n\n")
 	if len(d.Places) == 0 {
-		b.WriteString("(ninguno)\n")
+		b.WriteString("(none)\n")
 	}
 	for _, p := range d.Places {
 		if p.InIt {
 			fmt.Fprintf(&b, "- %s → it docid %d\n", p.Name, p.ItDocID)
 		} else {
-			fmt.Fprintf(&b, "- %s (no encontrado en it)\n", p.Name)
+			fmt.Fprintf(&b, "- %s (not found in it)\n", p.Name)
 		}
 	}
 

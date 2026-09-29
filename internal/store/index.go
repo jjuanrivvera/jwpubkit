@@ -43,11 +43,11 @@ type IndexStats struct {
 }
 
 func (st IndexStats) String() string {
-	s := fmt.Sprintf("%d documentos, %d párrafos", st.Docs, st.Pars)
+	s := fmt.Sprintf("%d documents, %d paragraphs", st.Docs, st.Pars)
 	if st.Verses > 0 {
-		s += fmt.Sprintf(", %d versículos, %d notas de estudio, %d notas al pie, %d referencias marginales", st.Verses, st.Notes, st.Footnotes, st.XRefs)
+		s += fmt.Sprintf(", %d verses, %d study notes, %d footnotes, %d marginal references", st.Verses, st.Notes, st.Footnotes, st.XRefs)
 	}
-	s += fmt.Sprintf(", %d citas bíblicas, %d medios, %d extractos", st.Cites, st.Media, st.Extracts)
+	s += fmt.Sprintf(", %d bible citations, %d media, %d extracts", st.Cites, st.Media, st.Extracts)
 	if st.Dated > 0 {
 		s += fmt.Sprintf(", %d semanas", st.Dated)
 	}
@@ -58,6 +58,7 @@ func (st IndexStats) String() string {
 type indexer struct {
 	jf    *jwpub.File
 	tx    *sql.Tx
+	lang  string
 	pubID int64
 	stats IndexStats
 	docs  map[int]int // local DocumentId -> MepsDocumentId
@@ -87,7 +88,7 @@ func (s *Store) Index(info PubInfo) (*IndexStats, error) {
 	}
 	defer tx.Rollback()
 
-	ix := &indexer{jf: jf, tx: tx, docs: map[int]int{}}
+	ix := &indexer{jf: jf, tx: tx, lang: info.Lang, docs: map[int]int{}}
 	if err := ix.upsertPub(info); err != nil {
 		return nil, err
 	}
@@ -98,7 +99,7 @@ func (s *Store) Index(info PubInfo) (*IndexStats, error) {
 		{"documentos", ix.documents},
 		{"medios", ix.media},
 		{"extractos", ix.extracts},
-		{"versículos", ix.verses}, // before marginalRefs: it finds the letters
+		{"verses", ix.verses}, // before marginalRefs: it finds the letters
 		{"referencias marginales", ix.marginalRefs},
 		{"fechas", ix.dated},
 		{"preguntas", ix.questions},
@@ -232,7 +233,7 @@ func (ix *indexer) documents() error {
 		if len(blob) > 0 {
 			htmlText, err = jf.Decrypt(blob)
 			if err != nil {
-				return fmt.Errorf("documento %d: %w", docid, err)
+				return fmt.Errorf("document %d: %w", docid, err)
 			}
 		}
 		if _, err := delPars.Exec(docid); err != nil {
@@ -248,7 +249,7 @@ func (ix *indexer) documents() error {
 		}
 		parsed, err := content.Parse(htmlText)
 		if err != nil {
-			return fmt.Errorf("documento %d: %w", docid, err)
+			return fmt.Errorf("document %d: %w", docid, err)
 		}
 		for _, b := range parsed.Blocks {
 			text := b.Text()
@@ -336,7 +337,7 @@ var (
 )
 
 // SplitCaption separates the location and title of an Extract/DatedText
-// caption: `<span class="eloc">w13 15/1 pág. 9</span> <span class="etitle">…</span>`.
+// caption: `<span class="eloc">…location…</span> <span class="etitle">…title…</span>`.
 func SplitCaption(c string) (loc, title string) {
 	if m := elocRe.FindStringSubmatch(c); m != nil {
 		loc = content.InnerText(m[1])
@@ -396,7 +397,7 @@ func (ix *indexer) extracts() error {
 		var htmlText string
 		if len(blob) > 0 {
 			if htmlText, err = jf.Decrypt(blob); err != nil {
-				return fmt.Errorf("extracto %d: %w", extID, err)
+				return fmt.Errorf("extract %d: %w", extID, err)
 			}
 		}
 		loc, title := SplitCaption(caption.String)
@@ -515,10 +516,47 @@ func (ix *indexer) questions() error {
 
 // verses stores the Bible text, its footnotes and the letters and anchor
 // words of footnote calls and marginal references.
+// bookNames records how this Bible names its books, which is what lets the CLI
+// parse and print references in the library's language without carrying a
+// hand-written table for each of the languages jw.org publishes.
+func (ix *indexer) bookNames() error {
+	jf := ix.jf
+	if !jf.HasTable("BibleBook") {
+		return nil
+	}
+	rows, err := jf.DB.Query(`SELECT BibleBookId, COALESCE(ChapterDisplayTitle, '') FROM BibleBook`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	ins, err := ix.tx.Prepare(`INSERT OR REPLACE INTO book_name(lang, book, name) VALUES(?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer ins.Close()
+	for rows.Next() {
+		var num int
+		var name string
+		if err := rows.Scan(&num, &name); err != nil {
+			return err
+		}
+		if num < 1 || num > 66 || strings.TrimSpace(name) == "" {
+			continue
+		}
+		if _, err := ins.Exec(ix.lang, num, name); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}
+
 func (ix *indexer) verses() error {
 	jf := ix.jf
 	if !jf.HasTable("BibleVerse") || !jf.HasTable("BibleChapter") {
 		return nil
+	}
+	if err := ix.bookNames(); err != nil {
+		return err
 	}
 	rows, err := jf.DB.Query(`SELECT BibleVerseId, Content FROM BibleVerse ORDER BY BibleVerseId`)
 	if err != nil {
@@ -543,7 +581,7 @@ func (ix *indexer) verses() error {
 		h, err := jf.Decrypt(blob)
 		if err != nil {
 			rows.Close()
-			return fmt.Errorf("versículo %d: %w", id, err)
+			return fmt.Errorf("verse %d: %w", id, err)
 		}
 		b, c, v, text, ok := content.VerseText(h)
 		if !ok {

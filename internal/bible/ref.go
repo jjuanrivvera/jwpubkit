@@ -9,11 +9,11 @@ import (
 
 // Range is a contiguous run of verses inside one book.
 type Range struct {
-	Book         int `json:"libro"`
-	StartChapter int `json:"capitulo_inicio"`
-	StartVerse   int `json:"versiculo_inicio"`
-	EndChapter   int `json:"capitulo_fin"`
-	EndVerse     int `json:"versiculo_fin"`
+	Book         int `json:"book"`
+	StartChapter int `json:"start_chapter"`
+	StartVerse   int `json:"start_verse"`
+	EndChapter   int `json:"end_chapter"`
+	EndVerse     int `json:"end_verse"`
 }
 
 // FirstID and LastID bound the range in BibleVerseId numbering.
@@ -55,10 +55,16 @@ func (r Range) format(book string) string {
 }
 
 // String uses the short abbreviation: "Jer 38:1-13".
-func (r Range) String() string { return r.format(Books[r.Book-1].Short) }
+func (r Range) String() string {
+	b, _ := BookByNum(r.Book)
+	return r.format(b.Short)
+}
 
-// Long uses the full book name: "Jeremías 38:1-13".
-func (r Range) Long() string { return r.format(Books[r.Book-1].Name) }
+// Long uses the full book name: "Jeremiah 38:1-13".
+func (r Range) Long() string {
+	b, _ := BookByNum(r.Book)
+	return r.format(b.Name)
+}
 
 // Verses enumerates the (chapter, verse) pairs of the range.
 func (r Range) Verses() [][2]int {
@@ -116,7 +122,7 @@ var bookPrefix = regexp.MustCompile(`^\s*([1-3]\s*)?([\p{L}][\p{L}\s.]*?)\.?\s*(
 
 // Parse reads one or more references separated by ";":
 //
-//	"Jer 38:6", "Jer 38:1-13", "Jeremías 38, 39", "1 Cor. 13:4-7",
+//	"Jer 38:6", "Jer 38:1-13", "Jeremiah 38, 39", "1 Cor. 13:4-7",
 //	"Sal 23", "Jer 38:28–39:2", "Jer 38:6; 39:1, 4-6", "3 Juan 3, 4".
 //
 // A segment without a book name continues the previous book.
@@ -134,7 +140,7 @@ func Parse(s string) ([]Range, error) {
 			name := strings.TrimSpace(m[1] + m[2])
 			b, ok := LookupBook(name)
 			if !ok {
-				return nil, fmt.Errorf("libro desconocido: %q", name)
+				return nil, fmt.Errorf("unknown book: %q", name)
 			}
 			book = b.Num
 			rest = m[3]
@@ -161,7 +167,7 @@ func parseNumbers(book int, s string) ([]Range, error) {
 		if oneChapter {
 			return []Range{{book, 1, 1, 1, VerseCount(book, 1)}}, nil
 		}
-		return nil, fmt.Errorf("falta el capítulo")
+		return nil, fmt.Errorf("the chapter is missing")
 	}
 	var out []Range
 	chapter := 0
@@ -187,7 +193,7 @@ func parseNumbers(book int, s string) ([]Range, error) {
 			r = Range{book, v1, firstVerse(book, v1), v1, VerseCount(book, v1)}
 		case c1 == 0:
 			if chapter == 0 {
-				return nil, fmt.Errorf("versículo %d sin capítulo", v1)
+				return nil, fmt.Errorf("verse %d has no chapter", v1)
 			}
 			r = Range{book, chapter, v1, chapter, v1}
 		default:
@@ -231,30 +237,31 @@ func splitCV(s string) (int, int, error) {
 	if !found {
 		n, err := strconv.Atoi(s)
 		if err != nil {
-			return 0, 0, fmt.Errorf("número inválido %q", s)
+			return 0, 0, fmt.Errorf("invalid number %q", s)
 		}
 		return 0, n, nil
 	}
 	cn, err1 := strconv.Atoi(strings.TrimSpace(c))
 	vn, err2 := strconv.Atoi(strings.TrimSpace(v))
 	if err1 != nil || err2 != nil {
-		return 0, 0, fmt.Errorf("referencia inválida %q", s)
+		return 0, 0, fmt.Errorf("invalid reference %q", s)
 	}
 	return cn, vn, nil
 }
 
 func validate(r Range) error {
-	name := Books[r.Book-1].Name
+	bk, _ := BookByNum(r.Book)
+	name := bk.Name
 	for _, cv := range [][2]int{{r.StartChapter, r.StartVerse}, {r.EndChapter, r.EndVerse}} {
 		if cv[0] < 1 || cv[0] > ChapterCount(r.Book) {
-			return fmt.Errorf("%s no tiene capítulo %d", name, cv[0])
+			return fmt.Errorf("%s has no chapter %d", name, cv[0])
 		}
 		if _, ok := VerseID(r.Book, cv[0], cv[1]); !ok {
-			return fmt.Errorf("%s %d no tiene versículo %d", name, cv[0], cv[1])
+			return fmt.Errorf("%s %d has no verse %d", name, cv[0], cv[1])
 		}
 	}
 	if r.EndChapter < r.StartChapter || (r.EndChapter == r.StartChapter && r.EndVerse < r.StartVerse) {
-		return fmt.Errorf("rango invertido en %s", r.Long())
+		return fmt.Errorf("the range runs backwards in %s", r.Long())
 	}
 	return nil
 }
@@ -267,7 +274,8 @@ func FormatList(rs []Range) string {
 	for _, r := range rs {
 		s := r.String()
 		if r.Book == prev {
-			s = strings.TrimPrefix(s, Books[r.Book-1].Short+" ")
+			b, _ := BookByNum(r.Book)
+			s = strings.TrimPrefix(s, b.Short+" ")
 		}
 		parts = append(parts, s)
 		prev = r.Book

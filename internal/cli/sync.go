@@ -13,20 +13,22 @@ func (a *app) syncCmd() *cobra.Command {
 	var issue, file string
 	var force bool
 	cmd := &cobra.Command{
-		Use:   "sync <símbolo>...",
-		Short: "Descarga (con caché y checksum), descifra e indexa publicaciones",
-		Long: `Descarga el JWPUB de cada símbolo desde la API pub-media de jw.org, verifica su MD5,
-lo descifra e indexa en la biblioteca. Si la copia local ya coincide con el checksum
-de la CDN no descarga nada.
+		Use:   "sync <symbol>...",
+		Short: "Download (cached, checksum-verified), decrypt and index publications",
+		Long: `Downloads each symbol's JWPUB from the jw.org pub-media API, checks its MD5,
+decrypts it and indexes it into the library. Nothing is downloaded when the local
+copy already matches the CDN checksum.
 
-Símbolos útiles: mwb (Guía de actividades, con --issue AAAAMM), w (La Atalaya de
-estudio, con --issue AAAAMM; las anteriores a 2016 usan AAAAMMDD), nwtsty (Biblia
-de estudio), it (Perspicacia), wcg, lmd, th, jr, gl, lff, ijwia, sjj...`,
+Symbols worth knowing: mwb (meeting workbook, with --issue YYYYMM), w (study
+Watchtower, with --issue YYYYMM; before 2016 it is YYYYMMDD), nwtsty (study Bible),
+it, wcg, lmd, th, jr, gl, lff, ijwia, sjj…
+
+Publications are fetched in the language given by --language (default E).`,
 		Example: `  pubkit sync mwb --issue 202609
   pubkit sync w --issue 202607
   pubkit sync nwtsty it wcg
-  pubkit sync w --issue 20130115
-  pubkit sync --archivo ~/Descargas/mwb_S_202609.jwpub mwb --issue 202609`,
+  pubkit sync w --issue 20130115 --language S
+  pubkit sync --file ~/Downloads/mwb_E_202609.jwpub mwb --issue 202609`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.store()
@@ -35,16 +37,16 @@ de estudio), it (Perspicacia), wcg, lmd, th, jr, gl, lff, ijwia, sjj...`,
 			}
 			if file != "" {
 				if len(args) != 1 {
-					return fmt.Errorf("con --archivo indica un solo símbolo")
+					return fmt.Errorf("--file takes exactly one symbol")
 				}
 				stats, err := st.IndexLocal(file, args[0], issue, a.lang)
 				if err != nil {
 					return err
 				}
 				if a.jsonOut {
-					return a.printJSON(map[string]any{"clave": store.PubKey(args[0], a.lang, store.NormalizeIssue(issue)), "resumen": stats.String(), "indexado_ms": stats.Elapsed.Milliseconds()})
+					return a.printJSON(map[string]any{"key": store.PubKey(args[0], a.lang, store.NormalizeIssue(issue)), "summary": stats.String(), "indexed_ms": stats.Elapsed.Milliseconds()})
 				}
-				a.printf("✓ %s indexado desde %s en %s: %s\n", store.PubKey(args[0], a.lang, store.NormalizeIssue(issue)), file, ms(stats.Elapsed), stats)
+				a.printf("✓ %s indexed from %s in %s: %s\n", store.PubKey(args[0], a.lang, store.NormalizeIssue(issue)), file, ms(stats.Elapsed), stats)
 				return nil
 			}
 			var results []*store.SyncResult
@@ -64,37 +66,37 @@ de estudio), it (Perspicacia), wcg, lmd, th, jr, gl, lff, ijwia, sjj...`,
 				}
 				switch {
 				case res.UpToDate:
-					a.printf("✓ %s al día (%s, md5 %s)\n  %s\n", res.Key, mb(res.Size), res.MD5, res.Title)
+					a.printf("✓ %s up to date (%s, md5 %s)\n  %s\n", res.Key, mb(res.Size), res.MD5, res.Title)
 				default:
-					dl := "copia en caché verificada"
+					dl := "cached copy verified"
 					if res.Downloaded {
-						dl = fmt.Sprintf("descargado %s en %s", mb(res.Size), ms(res.Download))
+						dl = fmt.Sprintf("downloaded %s in %s", mb(res.Size), ms(res.Download))
 					}
-					a.printf("✓ %s · %s · indexado en %s\n  %s\n  %s\n", res.Key, dl, ms(res.Stats.Elapsed), res.Title, res.Summary)
+					a.printf("✓ %s · %s · indexed in %s\n  %s\n  %s\n", res.Key, dl, ms(res.Stats.Elapsed), res.Title, res.Summary)
 				}
 			}
 			if a.jsonOut {
-				if err := a.printJSON(map[string]any{"sincronizados": results, "errores": failed}); err != nil {
+				if err := a.printJSON(map[string]any{"synced": results, "errors": failed}); err != nil {
 					return err
 				}
 			}
 			if len(failed) > 0 {
-				return fmt.Errorf("%d de %d publicaciones fallaron", len(failed), len(args))
+				return fmt.Errorf("%d of %d publications failed", len(failed), len(args))
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&issue, "issue", "", "número de la publicación periódica: AAAAMM (o AAAAMMDD antes de 2016)")
-	cmd.Flags().BoolVar(&force, "forzar", false, "descargar e indexar aunque la copia local esté al día")
-	cmd.Flags().StringVar(&file, "archivo", "", "indexar un .jwpub local en vez de descargarlo")
+	cmd.Flags().StringVar(&issue, "issue", "", "issue of a periodical: YYYYMM (or YYYYMMDD before 2016)")
+	cmd.Flags().BoolVar(&force, "force", false, "download and index even when the local copy is up to date")
+	cmd.Flags().StringVar(&file, "file", "", "index a local .jwpub instead of downloading it")
 	return cmd
 }
 
 func (a *app) pubsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "pubs",
-		Aliases: []string{"biblioteca", "lista"},
-		Short:   "Lista las publicaciones de la biblioteca local",
+		Aliases: []string{"library", "list", "biblioteca", "lista"},
+		Short:   "List the publications held in the local library",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.store()
@@ -109,7 +111,7 @@ func (a *app) pubsCmd() *cobra.Command {
 				return a.printJSON(pubs)
 			}
 			if len(pubs) == 0 {
-				a.printf("La biblioteca %s está vacía. Empieza con: pubkit sync mwb --issue AAAAMM\n", a.libDir)
+				a.printf("The library %s is empty. Start with: pubkit sync mwb --issue YYYYMM\n", a.libDir)
 				return nil
 			}
 			var total int64
@@ -117,7 +119,7 @@ func (a *app) pubsCmd() *cobra.Command {
 				total += p.Size
 				a.printf("%-18s %-8s %5d docs  %9s  %s\n", p.Key, p.MepsSymbol, p.Docs, mb(p.Size), p.Title)
 			}
-			a.printf("%d publicaciones, %s en caché en %s\n", len(pubs), mb(total), st.PubsDir())
+			a.printf("%d publications, %s cached in %s\n", len(pubs), mb(total), st.PubsDir())
 			return nil
 		},
 	}

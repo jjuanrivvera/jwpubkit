@@ -98,12 +98,12 @@ func TestParse(t *testing.T) {
 		{"Jer 38:6; 39:1, 4-6", []Range{{24, 38, 6, 38, 6}, {24, 39, 1, 39, 1}, {24, 39, 4, 39, 6}}, "Jer 38:6; 39:1; 39:4-6"},
 		{"1 Cor. 13:4-7", []Range{{46, 13, 4, 13, 7}}, "1Co 13:4-7"},
 		{"1Co 13:4, 7", []Range{{46, 13, 4, 13, 4}, {46, 13, 7, 13, 7}}, "1Co 13:4; 13:7"},
-		{"3 Juan 3, 4", []Range{{64, 1, 3, 1, 3}, {64, 1, 4, 1, 4}}, "3Jn 3; 4"},
-		{"Jud 3-5", []Range{{65, 1, 3, 1, 5}}, "Jud 3-5"},
-		{"Sal 3", []Range{{19, 3, 0, 3, 8}}, "Sl 3"},
-		{"Sal. 25:12-15", []Range{{19, 25, 12, 25, 15}}, "Sl 25:12-15"},
-		{"Juan 17:3; Mateo 24:14", []Range{{43, 17, 3, 17, 3}, {40, 24, 14, 24, 14}}, "Jn 17:3; Mt 24:14"},
-		{"El Cantar de los Cantares 8:6", []Range{{22, 8, 6, 8, 6}}, "Can 8:6"},
+		{"3 Juan 3, 4", []Range{{64, 1, 3, 1, 3}, {64, 1, 4, 1, 4}}, "3Jo 3; 4"},
+		{"Jud 3-5", []Range{{65, 1, 3, 1, 5}}, "Jude 3-5"},
+		{"Sal 3", []Range{{19, 3, 0, 3, 8}}, "Ps 3"},
+		{"Sal. 25:12-15", []Range{{19, 25, 12, 25, 15}}, "Ps 25:12-15"},
+		{"Juan 17:3; Mateo 24:14", []Range{{43, 17, 3, 17, 3}, {40, 24, 14, 24, 14}}, "Joh 17:3; Mt 24:14"},
+		{"El Cantar de los Cantares 8:6", []Range{{22, 8, 6, 8, 6}}, "Ca 8:6"},
 	}
 	for _, c := range cases {
 		got, err := Parse(c.in)
@@ -121,7 +121,7 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseErrors(t *testing.T) {
-	for _, in := range []string{"", "Jer", "Jer 53:1", "Jer 38:29", "Libro 1:1", "38:6", "Jer 38:10-5"} {
+	for _, in := range []string{"", "Jer", "Jer 53:1", "Jer 38:29", "NotABook 1:1", "38:6", "Jer 38:10-5"} {
 		if _, err := Parse(in); err == nil {
 			t.Errorf("Parse(%q) should fail", in)
 		}
@@ -140,14 +140,100 @@ func TestParseLink(t *testing.T) {
 	if _, ok := ParseLink("jwpub://p/S:2013043/22-22"); ok {
 		t.Fatal("publication link parsed as Bible link")
 	}
-	if r.Long() != "Juan 17:3" {
+	if r.Long() != "John 17:3" {
 		t.Fatalf("Long() = %q", r.Long())
 	}
 }
 
 func TestFormatList(t *testing.T) {
 	rs := []Range{{24, 38, 7, 38, 9}, {24, 39, 15, 39, 18}, {43, 17, 3, 17, 3}}
-	if got := FormatList(rs); got != "Jer 38:7-9; 39:15-18; Jn 17:3" {
+	if got := FormatList(rs); got != "Jer 38:7-9; 39:15-18; Joh 17:3" {
 		t.Fatalf("FormatList = %q", got)
+	}
+}
+
+// A reference typed in one language must be understood whatever language the
+// output is in: someone reading an English library still pastes "Jer 38:6" from
+// a Spanish article, and both spellings mean the same verse.
+func TestNamesAcrossLanguages(t *testing.T) {
+	for _, in := range []string{"Génesis 1:1", "Genesis 1:1", "Gen 1:1", "Gé 1:1"} {
+		rs, err := Parse(in)
+		if err != nil || len(rs) != 1 || rs[0].Book != 1 {
+			t.Errorf("Parse(%q) = %+v, %v", in, rs, err)
+		}
+	}
+}
+
+// Display follows the chosen language; parsing does not narrow.
+func TestUseLanguage(t *testing.T) {
+	t.Cleanup(func() { UseLanguage(DefaultLang) })
+
+	rs, err := Parse("Jer 38:6")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rs[0].Long(); got != "Jeremiah 38:6" {
+		t.Errorf("english default: Long() = %q", got)
+	}
+
+	UseLanguage("S")
+	if got := rs[0].Long(); got != "Jeremías 38:6" {
+		t.Errorf("spanish: Long() = %q", got)
+	}
+	if got := rs[0].String(); got != "Jer 38:6" {
+		t.Errorf("spanish: String() = %q", got)
+	}
+	// An English reference still parses while Spanish names are on display.
+	if _, err := Parse("John 3:16"); err != nil {
+		t.Errorf("english reference under a spanish display: %v", err)
+	}
+
+	// An unknown language falls back to the built-in names instead of failing.
+	UseLanguage("ZZ")
+	if got := rs[0].Long(); got != "Jeremiah 38:6" {
+		t.Errorf("unknown language should fall back to english, got %q", got)
+	}
+}
+
+// A language jw.org publishes but this package never heard of is learned from
+// the library: that is how every language beyond the two built in is supported.
+func TestRegisterLearnsALanguage(t *testing.T) {
+	t.Cleanup(func() { UseLanguage(DefaultLang) })
+
+	Register("XX", map[int]string{24: "Yirmeyahu", 43: "Yohanan"})
+	UseLanguage("XX")
+	rs, err := Parse("Yirmeyahu 38:6")
+	if err != nil || len(rs) != 1 || rs[0].Book != 24 {
+		t.Fatalf("a learned name should parse: %+v %v", rs, err)
+	}
+	if got := rs[0].Long(); got != "Yirmeyahu 38:6" {
+		t.Errorf("Long() = %q", got)
+	}
+	// Books the library did not name fall back rather than printing nothing.
+	b, _ := BookByNum(1)
+	if b.Name != "Genesis" {
+		t.Errorf("unnamed book should fall back to english, got %q", b.Name)
+	}
+}
+
+// A built-in language must not have its citation forms overwritten by what a
+// library happens to call a book: Bibles carry display titles, and a gospel's
+// display title is not how anyone cites it.
+func TestRegisterDoesNotOverwriteBuiltIn(t *testing.T) {
+	t.Cleanup(func() { UseLanguage(DefaultLang) })
+
+	Register("S", map[int]string{43: "Las Buenas Noticias según Juan"})
+	UseLanguage("S")
+
+	rs, err := Parse("Juan 3:16")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rs[0].Long(); got != "Juan 3:16" {
+		t.Errorf("a learned display title replaced the citation name: %q", got)
+	}
+	// It still has to be understood when someone pastes it.
+	if _, err := Parse("Las Buenas Noticias según Juan 3:16"); err != nil {
+		t.Errorf("the learned title should still parse: %v", err)
 	}
 }

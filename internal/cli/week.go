@@ -14,32 +14,32 @@ import (
 	"github.com/jjuanrivvera/jwpubkit/internal/subs"
 )
 
-func (a *app) semanaCmd() *cobra.Command {
+func (a *app) weekCmd() *cobra.Command {
 	var noWT, extracts bool
 	cmd := &cobra.Command{
-		Use:     "semana [AAAA-MM-DD]",
-		Aliases: []string{"week"},
-		Short:   "La reunión de entre semana y La Atalaya de estudio de esa semana",
-		Long: `Toma el lunes de la semana de la fecha (hoy si no se indica) y arma, desde la Guía de
-actividades: docid, lectura bíblica semanal, lectura del estudiante y su lección de
-"Seamos mejores maestros", canciones, cada parte con su título, tiempo, preguntas,
-referencias (citas y docids, con el texto que la Guía trae de cada referencia), videos
-(con su clave para "pubkit subtitulos") e imágenes. El estudio bíblico de la congregación
-incluye el capítulo completo que trae la Guía: título, relatos, preguntas y videos.
+		Use:     "week [YYYY-MM-DD]",
+		Aliases: []string{"semana"},
+		Short:   "The midweek meeting and that week's study Watchtower",
+		Long: `Takes the Monday of the given date's week (today when none is given) and assembles,
+from the meeting workbook: docid, the weekly Bible reading, the student reading with
+its teaching lesson, songs, every part with its title, time, questions, references
+(citations and docids, with the text the workbook carries for each one), videos (with
+the key for "pubkit subtitles") and images. The congregation Bible study brings the
+whole chapter the workbook points at: title, accounts, questions and videos.
 
-Si existe, agrega La Atalaya de estudio de esa semana: docid, título, texto temático,
-canciones y preguntas por párrafo. Si falta la Guía o La Atalaya en la biblioteca, las
-sincroniza (salvo con --sin-red).`,
-		Example: `  pubkit semana 2026-09-28
-  pubkit semana 2026-09-30 --extractos
-  pubkit semana --json 2026-09-28 | jq '.secciones[].partes[] | {numero, titulo, minutos}'`,
+When it exists, the week's study Watchtower is added too: docid, title, theme text,
+songs and the questions paragraph by paragraph. Anything missing from the library is
+synced first, unless --offline says otherwise.`,
+		Example: `  pubkit week 2026-09-28
+  pubkit week 2026-09-30 --extracts
+  pubkit week --json 2026-09-28 | jq '.sections[].parts[] | {number, title, minutes}'`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			day := time.Now()
 			if len(args) == 1 {
 				d, err := time.ParseInLocation("2006-01-02", args[0], time.Local)
 				if err != nil {
-					return fmt.Errorf("fecha inválida %q (usa AAAA-MM-DD)", args[0])
+					return fmt.Errorf("invalid date %q (use YYYY-MM-DD)", args[0])
 				}
 				day = d
 			}
@@ -55,8 +55,8 @@ sincroniza (salvo con --sin-red).`,
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&noWT, "sin-atalaya", false, "no incluir La Atalaya de estudio")
-	cmd.Flags().BoolVar(&extracts, "extractos", false, "mostrar el texto de cada referencia que trae la Guía")
+	cmd.Flags().BoolVar(&noWT, "no-watchtower", false, "leave out the study Watchtower")
+	cmd.Flags().BoolVar(&extracts, "extracts", false, "print the text the workbook carries for each reference")
 	return cmd
 }
 
@@ -76,17 +76,17 @@ func (a *app) buildWeek(day time.Time, withWT bool) (*meeting.Week, error) {
 	if dd == nil {
 		issue := meeting.WorkbookIssue(monday)
 		if a.offline {
-			return nil, fmt.Errorf("la Guía de la semana del %s no está en la biblioteca (pubkit sync mwb --issue %s)", w.Monday, issue)
+			return nil, fmt.Errorf("the workbook for the week of %s is not in the library (pubkit sync mwb --issue %s)", w.Monday, issue)
 		}
-		a.logf("la Guía mwb %s no está en la biblioteca; sincronizando", issue)
+		a.logf("workbook mwb %s is not in the library; syncing it", issue)
 		if _, err := a.syncOne("mwb", issue, false); err != nil {
-			return nil, fmt.Errorf("sincronizando la Guía mwb %s: %w", issue, err)
+			return nil, fmt.Errorf("syncing workbook mwb %s: %w", issue, err)
 		}
 		if dd, err = b.FindWorkbook(monday); err != nil {
 			return nil, err
 		}
 		if dd == nil {
-			return nil, fmt.Errorf("la Guía mwb %s no trae la semana del %s (¿asamblea, Conmemoración o visita?)", issue, w.Monday)
+			return nil, fmt.Errorf("workbook mwb %s has no week of %s (an assembly, the Memorial or a visit?)", issue, w.Monday)
 		}
 	}
 	if err := b.BuildWorkbook(w, dd.DocID, *dd); err != nil {
@@ -103,7 +103,7 @@ func (a *app) buildWeek(day time.Time, withWT bool) (*meeting.Week, error) {
 				if p, _ := st.PubByKey(store.PubKey("w", a.lang, issue)); p != nil {
 					continue
 				}
-				a.logf("buscando La Atalaya de estudio de la semana en w %s", issue)
+				a.logf("looking for the week's study Watchtower in w %s", issue)
 				if _, err := a.syncOne("w", issue, false); err != nil {
 					a.logf("w %s: %v", issue, err)
 					continue
@@ -121,8 +121,13 @@ func (a *app) buildWeek(day time.Time, withWT bool) (*meeting.Week, error) {
 				return nil, err
 			}
 		} else {
-			w.Notes = append(w.Notes, "No se encontró La Atalaya de estudio para esta semana (probadas: w "+strings.Join(meeting.WatchtowerIssues(monday), ", ")+").")
+			w.Notes = append(w.Notes, "No study Watchtower found for this week (tried: w "+strings.Join(meeting.WatchtowerIssues(monday), ", ")+").")
 		}
+	}
+	if !meeting.Parses(a.lang) {
+		w.Notes = append(w.Notes, "The meeting parser currently recognizes the workbook markup of these languages: "+
+			strings.Join(meeting.ParsedLanguages, ", ")+". In "+a.lang+" the parts and their text are still listed, but the "+
+			"derived fields (weekly reading, student reading, songs, congregation study) may come back empty.")
 	}
 	a.resolveVideos(w)
 	return w, nil
@@ -161,15 +166,15 @@ func (a *app) videoInfo(st *store.Store, key string) (title, dur string, err err
 
 func (a *app) printWeek(w *meeting.Week, extracts bool) {
 	p := a.printf
-	p("Semana del %s (lunes %s)\n", w.Range, w.Monday)
+	p("Week of %s (monday %s)\n", w.Range, w.Monday)
 	if g := w.Workbook; g != nil {
-		p("Guía de actividades: docid %d · %s · %s\n", g.DocID, g.Location, g.URL)
+		p("Meeting workbook: docid %d · %s · %s\n", g.DocID, g.Location, g.URL)
 	}
 	if r := w.WeeklyReading; r != nil {
-		p("Lectura bíblica semanal: %s (%s)\n", r.Text, r.Ref)
+		p("Weekly Bible reading: %s (%s)\n", r.Text, r.Ref)
 	}
 	if sr := w.StudentReading; sr != nil {
-		line := "Lectura del estudiante: " + sr.Ref
+		line := "Student reading: " + sr.Ref
 		if l := sr.Lesson; l != nil {
 			line += fmt.Sprintf(" · %s «%s» (docid %d)", l.Text, l.Title, l.DocID)
 		}
@@ -180,7 +185,7 @@ func (a *app) printWeek(w *meeting.Week, extracts bool) {
 		for _, s := range w.Songs {
 			ss = append(ss, fmt.Sprintf("%d «%s» (%s)", s.Number, s.Title, s.When))
 		}
-		p("Canciones: %s\n", strings.Join(ss, " · "))
+		p("Songs: %s\n", strings.Join(ss, " · "))
 	}
 	for _, sec := range w.Sections {
 		p("\n")
@@ -192,7 +197,7 @@ func (a *app) printWeek(w *meeting.Week, extracts bool) {
 		}
 	}
 	if len(w.Videos) > 0 {
-		p("\nVideos de la reunión (transcripción: pubkit subtitulos <clave>)\n")
+		p("\nMeeting videos (transcript: pubkit subtitles <key>)\n")
 		seen := map[string]bool{}
 		for _, v := range w.Videos {
 			if seen[v.Key] {
@@ -204,24 +209,24 @@ func (a *app) printWeek(w *meeting.Week, extracts bool) {
 				p(" (%s)", v.Duration)
 			}
 			if v.Part != "" {
-				p(" · parte %s", v.Part)
+				p(" · part %s", v.Part)
 			}
 			p("\n")
 		}
 	}
 	if wt := w.Watchtower; wt != nil {
-		p("\nLA ATALAYA DE ESTUDIO · %s\n", wt.Date)
+		p("\nSTUDY WATCHTOWER · %s\n", wt.Date)
 		p("«%s» · docid %d · %s · %s\n", wt.Title, wt.DocID, wt.Location, wt.URL)
 		if wt.Theme != "" {
-			p("Texto temático: %s\n", wt.Theme)
+			p("Theme text: %s\n", wt.Theme)
 		}
 		if wt.Summary != "" {
-			p("Tema: %s\n", wt.Summary)
+			p("Theme: %s\n", wt.Summary)
 		}
 		for _, s := range wt.Songs {
-			p("Canción %d «%s» (%s)\n", s.Number, s.Title, s.When)
+			p("Song %d «%s» (%s)\n", s.Number, s.Title, s.When)
 		}
-		p("Preguntas:\n")
+		p("Questions:\n")
 		sub := ""
 		for _, q := range wt.Questions {
 			if q.Subheading != sub && q.Subheading != "" {
@@ -231,20 +236,20 @@ func (a *app) printWeek(w *meeting.Week, extracts bool) {
 			p("    %s. %s\n", q.Paragraphs, q.Text)
 		}
 		for _, box := range wt.Boxes {
-			p("  Recuadro «%s»:\n", box.Title)
+			p("  Box «%s»:\n", box.Title)
 			for _, q := range box.Questions {
 				p("    - %s\n", q)
 			}
 		}
 		if len(wt.Images) > 0 {
-			p("  Imágenes (pubkit imagen %d):\n", wt.DocID)
+			p("  Images (pubkit image %d):\n", wt.DocID)
 			for _, im := range wt.Images {
 				p("    %s · %s\n", im.File, firstNonEmpty(im.Caption, im.Alt))
 			}
 		}
 	}
 	for _, n := range w.Notes {
-		p("\nAviso: %s\n", n)
+		p("\nNote: %s\n", n)
 	}
 }
 
@@ -265,7 +270,7 @@ func (a *app) printPart(part meeting.Part, extracts bool) {
 		p("     ? %s\n", q)
 	}
 	for _, r := range part.References {
-		if r.Kind == "biblia" {
+		if r.Kind == "bible" {
 			continue
 		}
 		loc := firstNonEmpty(r.Location, r.Text)
@@ -289,12 +294,12 @@ func (a *app) printPart(part meeting.Part, extracts bool) {
 	}
 	var bibleRefs []bible.Range
 	for _, r := range part.References {
-		if r.Kind == "biblia" && r.Range != nil {
+		if r.Kind == "bible" && r.Range != nil {
 			bibleRefs = append(bibleRefs, *r.Range)
 		}
 	}
 	if len(bibleRefs) > 0 {
-		p("     Textos: %s\n", bible.FormatList(bibleRefs))
+		p("     Scriptures: %s\n", bible.FormatList(bibleRefs))
 	}
 	for _, v := range part.Videos {
 		p("     Video: %s %s", v.Key, v.Title)
@@ -304,12 +309,12 @@ func (a *app) printPart(part meeting.Part, extracts bool) {
 		p("\n")
 	}
 	for _, im := range part.Images {
-		p("     Imagen: %s · %s\n", im.File, firstNonEmpty(im.Caption, im.Alt))
+		p("     Image: %s · %s\n", im.File, firstNonEmpty(im.Caption, im.Alt))
 	}
 	if sc := part.Study; sc != nil {
-		p("     Capítulo: %s · «%s» · %s · docid %d\n", sc.Label, sc.Title, sc.Location, sc.DocID)
+		p("     Chapter: %s · «%s» · %s · docid %d\n", sc.Label, sc.Title, sc.Location, sc.DocID)
 		if len(sc.Accounts) > 0 {
-			p("     Relato bíblico: %s\n", strings.Join(sc.Accounts, "; "))
+			p("     Bible account: %s\n", strings.Join(sc.Accounts, "; "))
 		}
 		for _, g := range sc.Groups {
 			p("     %s\n", g.Title)
@@ -328,7 +333,7 @@ func (a *app) printPart(part meeting.Part, extracts bool) {
 			p("\n")
 		}
 		if len(sc.Images) > 0 {
-			p("     Imágenes del capítulo: %d (pubkit imagen %d)\n", len(sc.Images), sc.DocID)
+			p("     Chapter images: %d (pubkit image %d)\n", len(sc.Images), sc.DocID)
 		}
 	}
 }

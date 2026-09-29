@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jjuanrivvera/jwpubkit/internal/bible"
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 	"github.com/jjuanrivvera/jwpubkit/internal/testutil"
 )
@@ -93,6 +94,11 @@ var watchtower = testutil.Pub{
 }
 
 func TestBuildWeekSynthetic(t *testing.T) {
+	// The fixture is a Spanish workbook, so the references are read and printed
+	// the way a Spanish library prints them.
+	bible.UseLanguage("S")
+	t.Cleanup(func() { bible.UseLanguage(bible.DefaultLang) })
+
 	st, err := store.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +136,7 @@ func TestBuildWeekSynthetic(t *testing.T) {
 	for _, s := range w.Songs {
 		songs = append(songs, s.When+":"+s.Title)
 	}
-	if strings.Join(songs, ",") != "inicio:Primera canción,medio:Segunda canción,final:Tercera canción" {
+	if strings.Join(songs, ",") != "start:Primera canción,middle:Segunda canción,end:Tercera canción" {
 		t.Errorf("songs %v", songs)
 	}
 
@@ -150,7 +156,7 @@ func TestBuildWeekSynthetic(t *testing.T) {
 	}
 	var ref Reference
 	for _, r := range parts[1].References {
-		if r.Kind == "publicacion" {
+		if r.Kind == "publication" {
 			ref = r
 		}
 	}
@@ -188,7 +194,7 @@ func TestBuildWeekSynthetic(t *testing.T) {
 	if wt.Title != "Un artículo de estudio" || wt.Date != "5-11 DE ENERO DE 2026" || wt.ThemeRef != "Jn 17:3" || wt.Summary != "De qué trata." {
 		t.Errorf("watchtower %+v", wt)
 	}
-	if len(wt.Songs) != 2 || wt.Songs[0].Number != 7 || wt.Songs[1].Number != 8 || wt.Songs[1].When != "final" {
+	if len(wt.Songs) != 2 || wt.Songs[0].Number != 7 || wt.Songs[1].Number != 8 || wt.Songs[1].When != "end" {
 		t.Errorf("wt songs %+v", wt.Songs)
 	}
 	if len(wt.Questions) != 2 || wt.Questions[1].Paragraphs != "2, 3" || wt.Questions[1].Subheading != "SUBTÍTULO" {

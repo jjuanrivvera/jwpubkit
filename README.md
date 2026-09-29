@@ -30,14 +30,31 @@ make lint
 make verify      # the gate: format, vet, lint, tests and the coverage floor
 ```
 
-The library defaults to `~/.local/share/jwlib`. Override it with `--biblioteca`,
+The library defaults to `~/.local/share/jwlib`. Override it with `--library`,
 `JWPUBKIT_HOME` (preferred), or the compatible `JWLIB_HOME` variable.
+
+## Language
+
+Publications are fetched in the language you ask for — the jw.org symbols: `E` english,
+`S` spanish, `F` french, and so on:
+
+```sh
+pubkit sync w --issue 202607 --language S
+export JWPUBKIT_LANG=S        # or set it once for a library that holds one language
+```
+
+Bible references are read and printed in the language of the Bible you synced: English and
+Spanish are built in, and every other language is learned from the Bible itself when it is
+indexed, so `pubkit verse` speaks whatever your library speaks.
+
+One command is narrower: `week` takes the meeting workbook apart by matching the headings the
+publication uses, and today it only knows how to do that in spanish. In any other language it
+still lists the parts and their text, and tells you which fields came back empty.
 
 ## Commands
 
-The examples below use the publication symbols and references you would actually type.
-Commands that read the library need the publication synced first; `sync` is the only one
-that reaches the network.
+The examples use the publication symbols and references you would actually type. Everything
+but `sync` and `subtitles` works offline, on what the library already holds.
 
 ### `sync`
 
@@ -46,31 +63,31 @@ Fetch and index a publication, or import a file you already have:
 ```sh
 pubkit sync mwb --issue 202609
 pubkit sync nwtsty it wcg
-pubkit sync --archivo ~/Downloads/mwb_S_202609.jwpub mwb --issue 202609
+pubkit sync --file ~/Downloads/mwb_E_202609.jwpub mwb --issue 202609
 ```
 
-### `semana`
+### `week`
 
 The week's meeting, assembled from what is indexed:
 
 ```sh
-pubkit semana 2026-01-05 --json
+pubkit week 2026-01-05 --json
 ```
 
-### `versiculo`
+### `verse`
 
 A passage with its footnotes and cross references:
 
 ```sh
-pubkit versiculo "Juan 3:16" --citas 40 --json
+pubkit verse "John 3:16" --citations 40 --json
 ```
 
-### `buscar`
+### `search`
 
 Full-text search across the library:
 
 ```sh
-pubkit buscar "cisterna" --pub it,w --limite 5
+pubkit search "cistern" --pub it,w --limit 5
 ```
 
 ### `doc`
@@ -78,23 +95,23 @@ pubkit buscar "cisterna" --pub it,w --limite 5
 Render a document by its id:
 
 ```sh
-pubkit doc 1102025901 --formato json
+pubkit doc 1102025901 --format json
 ```
 
-### `imagen`
+### `image`
 
 List or extract the media attached to a document:
 
 ```sh
-pubkit imagen 1102025901 --listar
+pubkit image 1102025901 --list
 ```
 
-### `subtitulos`
+### `subtitles`
 
-Subtitles for a video key:
+Transcribe a video from its subtitles:
 
 ```sh
-pubkit subtitulos pub-jwbai_201507_1_VIDEO --formato vtt
+pubkit subtitles pub-jwbai_201507_1_VIDEO --format vtt
 ```
 
 ### `pubs`
@@ -105,13 +122,13 @@ What the library currently holds:
 pubkit pubs --json
 ```
 
-### `expediente`
+### `dossier`
 
-A compact dossier for a passage — verses, notes, references and related articles in one
-JSON document:
+Everything around a passage — verses, notes, references and the articles that cite it — in one
+document meant to be read once:
 
 ```sh
-pubkit expediente "Jer 38:1-13" --json
+pubkit dossier "Jer 38:1-13" --json
 ```
 
 ### `completion` and `version`
@@ -123,10 +140,14 @@ pubkit version
 
 Most commands take `--json`. Run `pubkit <command> --help` for the full flags.
 
+The spanish command and flag names this tool shipped with (`semana`, `versiculo`, `buscar`,
+`imagen`, `subtitulos`, `expediente`, `--biblioteca`, `--limite`…) still work as aliases.
+
 ## Limits
 
 - Nothing is bundled: every command reads the library **you** synced on **your** machine.
 - `sync` and subtitle retrieval depend on jw.org being reachable.
+- `week` understands the workbook markup of spanish publications only, for now.
 - JWPUB layouts differ across generations; unsupported schemas or missing media can limit
   the fields available to the CLI.
 - This project does not bundle or redistribute publication files, text, images, audio, or

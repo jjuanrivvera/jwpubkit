@@ -13,18 +13,18 @@ import (
 // Pub is a publication of the library.
 type Pub struct {
 	ID         int64  `json:"-"`
-	Key        string `json:"clave"`
-	Symbol     string `json:"simbolo"`
-	Issue      string `json:"numero,omitempty"`
-	MepsSymbol string `json:"simbolo_meps"`
-	Title      string `json:"titulo"`
-	ShortTitle string `json:"titulo_corto"`
-	PubType    string `json:"tipo"`
-	File       string `json:"archivo"`
+	Key        string `json:"key"`
+	Symbol     string `json:"symbol"`
+	Issue      string `json:"number,omitempty"`
+	MepsSymbol string `json:"meps_symbol"`
+	Title      string `json:"title"`
+	ShortTitle string `json:"short_title"`
+	PubType    string `json:"kind"`
+	File       string `json:"file"`
 	MD5        string `json:"md5"`
 	Size       int64  `json:"bytes"`
-	SyncedAt   string `json:"sincronizado"`
-	Docs       int    `json:"documentos"`
+	SyncedAt   string `json:"synced_at"`
+	Docs       int    `json:"documents"`
 }
 
 const pubCols = `p.id, p.key, p.symbol, p.issue, COALESCE(p.meps_symbol,''), COALESCE(p.title,''), COALESCE(p.short_title,''),
@@ -84,7 +84,7 @@ type Doc struct {
 }
 
 // ErrNoDoc means the document is not in the library.
-var ErrNoDoc = errors.New("el documento no está en la biblioteca")
+var ErrNoDoc = errors.New("the document is not in the library")
 
 // Doc loads a document with its publication.
 func (s *Store) Doc(docid int) (*Doc, error) {
@@ -110,9 +110,9 @@ func (s *Store) Doc(docid int) (*Doc, error) {
 // DocSummary is what listings show about a document.
 type DocSummary struct {
 	DocID   int    `json:"docid"`
-	Pub     string `json:"publicacion"`
-	Title   string `json:"titulo"`
-	Context string `json:"contexto,omitempty"`
+	Pub     string `json:"publication"`
+	Title   string `json:"title"`
+	Context string `json:"context,omitempty"`
 }
 
 // Summaries loads titles for many documents at once.
@@ -148,14 +148,14 @@ func (s *Store) Summaries(ids []int) (map[int]DocSummary, error) {
 // SearchHit is one document found by the full-text search.
 type SearchHit struct {
 	DocID   int     `json:"docid"`
-	Pub     string  `json:"publicacion"`
-	PubKey  string  `json:"clave"`
-	Title   string  `json:"titulo"`
+	Pub     string  `json:"publication"`
+	PubKey  string  `json:"key"`
+	Title   string  `json:"title"`
 	PID     int     `json:"pid"`
-	Num     int     `json:"parrafo,omitempty"`
-	Snippet string  `json:"extracto"`
-	Matches int     `json:"coincidencias"`
-	Rank    float64 `json:"rango"`
+	Num     int     `json:"paragraph,omitempty"`
+	Snippet string  `json:"snippet"`
+	Matches int     `json:"matches"`
+	Rank    float64 `json:"range"`
 	URL     string  `json:"url"`
 }
 
@@ -224,7 +224,7 @@ func splitQuoted(q string) []queryPart {
 func (s *Store) Search(query string, pubs []string, limit int) ([]SearchHit, error) {
 	fq := FTSQuery(query)
 	if fq == "" {
-		return nil, errors.New("la búsqueda está vacía")
+		return nil, errors.New("the query is empty")
 	}
 	where := ""
 	args := []any{fq}
@@ -254,7 +254,7 @@ func (s *Store) Search(query string, pubs []string, limit int) ([]SearchHit, err
 	ORDER BY ranked.rank - ln(ranked.n) LIMIT ?`
 	rows, err := s.DB.Query(q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("búsqueda %q: %w", fq, err)
+		return nil, fmt.Errorf("query %q: %w", fq, err)
 	}
 	defer rows.Close()
 	var out []SearchHit
@@ -272,17 +272,17 @@ func (s *Store) Search(query string, pubs []string, limit int) ([]SearchHit, err
 // VerseHit is a Bible verse found by the full-text search.
 type VerseHit struct {
 	ID      int    `json:"id"`
-	Book    int    `json:"libro"`
-	Chapter int    `json:"capitulo"`
-	Verse   int    `json:"versiculo"`
-	Snippet string `json:"extracto"`
+	Book    int    `json:"book"`
+	Chapter int    `json:"chapter"`
+	Verse   int    `json:"verse"`
+	Snippet string `json:"snippet"`
 }
 
 // SearchVerses searches the Bible text.
 func (s *Store) SearchVerses(query string, limit int) ([]VerseHit, error) {
 	fq := FTSQuery(query)
 	if fq == "" {
-		return nil, errors.New("la búsqueda está vacía")
+		return nil, errors.New("the query is empty")
 	}
 	rows, err := s.DB.Query(`SELECT verse.id, verse.book, verse.chapter, verse.verse, snippet(verse_fts, 0, '«', '»', '…', 24)
 		FROM verse_fts JOIN verse ON verse.id = verse_fts.rowid WHERE verse_fts MATCH ? ORDER BY verse.id LIMIT ?`, fq, limit)
@@ -304,34 +304,34 @@ func (s *Store) SearchVerses(query string, limit int) ([]VerseHit, error) {
 // Verse is one verse of the study Bible with its apparatus.
 type Verse struct {
 	ID        int         `json:"id"`
-	Book      int         `json:"libro"`
-	Chapter   int         `json:"capitulo"`
-	Verse     int         `json:"versiculo"`
-	Text      string      `json:"texto"`
-	Footnotes []Footnote  `json:"notas_al_pie,omitempty"`
-	XRefs     []XRef      `json:"referencias_marginales,omitempty"`
-	Notes     []StudyNote `json:"notas_de_estudio,omitempty"`
+	Book      int         `json:"book"`
+	Chapter   int         `json:"chapter"`
+	Verse     int         `json:"verse"`
+	Text      string      `json:"text"`
+	Footnotes []Footnote  `json:"footnotes,omitempty"`
+	XRefs     []XRef      `json:"marginal_references,omitempty"`
+	Notes     []StudyNote `json:"study_notes,omitempty"`
 }
 
 // Footnote of the Bible text.
 type Footnote struct {
-	Marker string `json:"letra"`
-	Anchor string `json:"palabra"`
-	Text   string `json:"texto"`
+	Marker string `json:"letter"`
+	Anchor string `json:"anchor"`
+	Text   string `json:"text"`
 }
 
 // XRef is one marginal reference letter and its targets (verse ids).
 type XRef struct {
-	Marker  string   `json:"letra"`
-	Anchor  string   `json:"palabra"`
+	Marker  string   `json:"letter"`
+	Anchor  string   `json:"anchor"`
 	Targets [][2]int `json:"-"`
-	Refs    []string `json:"referencias"`
+	Refs    []string `json:"references"`
 }
 
 // StudyNote is a study note (nota de estudio) attached to a verse.
 type StudyNote struct {
-	Label string `json:"etiqueta"`
-	Text  string `json:"texto"`
+	Label string `json:"label"`
+	Text  string `json:"text"`
 	DocID int    `json:"docid,omitempty"`
 }
 
@@ -340,6 +340,16 @@ func (s *Store) HasBible() bool {
 	var n int
 	s.DB.QueryRow(`SELECT count(*) FROM verse`).Scan(&n)
 	return n > 0
+}
+
+// BibleTitle is the name the synced Bible gives itself, which is the only
+// language-correct way to label the text: the tool has no business hardcoding a
+// translation's name in one language when the library may hold any of them.
+func (s *Store) BibleTitle() string {
+	var title string
+	s.DB.QueryRow(`SELECT COALESCE(p.title, '') FROM pub p
+		JOIN verse v ON v.pub_id = p.id GROUP BY p.id ORDER BY count(*) DESC LIMIT 1`).Scan(&title)
+	return title
 }
 
 // Verses loads verses first..last (BibleVerseId) with footnotes, marginal
@@ -430,11 +440,11 @@ func (s *Store) Verses(first, last int) ([]Verse, error) {
 // Citation is a document that cites a verse.
 type Citation struct {
 	DocID int    `json:"docid"`
-	Pub   string `json:"publicacion"`
-	Title string `json:"titulo"`
+	Pub   string `json:"publication"`
+	Title string `json:"title"`
 	PIDs  []int  `json:"pids"`
 	URL   string `json:"url"`
-	Year  int    `json:"anio,omitempty"`
+	Year  int    `json:"year,omitempty"`
 }
 
 // CitedBy lists documents whose BibleCitation rows cover any verse in
@@ -568,8 +578,8 @@ type Extract struct {
 	DocID      int    // document holding the reference
 	BeginPID   int    // where in that document
 	Link       string // "p/S:2013043/22-22"
-	Caption    string // "w13 15/1 pág. 9"
-	Title      string // "Sea valiente, Jehová está con usted"
+	Caption    string // where the citation sits, as the publication writes it
+	Title      string // the citing document's title
 	RefDocID   int
 	RefClass   int
 	RefBegin   int

@@ -27,7 +27,7 @@ func init() {
 			}
 			n, err := strconv.Atoi(item)
 			if err != nil {
-				panic("bible: versificación corrupta: " + spec)
+				panic("bible: corrupt versification: " + spec)
 			}
 			ci.verses = n
 			chapters[b+1] = append(chapters[b+1], ci)

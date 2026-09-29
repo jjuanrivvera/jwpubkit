@@ -11,57 +11,60 @@ import (
 )
 
 type verseResult struct {
-	Ref         string           `json:"referencia"`
-	Ranges      []bible.Range    `json:"rangos"`
-	Verses      []store.Verse    `json:"versiculos"`
-	CitedBy     []store.Citation `json:"citado_en"`
-	CitedTotal  int              `json:"total_documentos_que_citan"`
-	Translation string           `json:"traduccion"`
+	Ref         string           `json:"reference"`
+	Ranges      []bible.Range    `json:"ranges"`
+	Verses      []store.Verse    `json:"verses"`
+	CitedBy     []store.Citation `json:"cited_in"`
+	CitedTotal  int              `json:"citing_documents_total"`
+	Translation string           `json:"translation"`
 }
 
-func (a *app) versiculoCmd() *cobra.Command {
-	var citas int
+func (a *app) verseCmd() *cobra.Command {
+	var citations int
 	var noNotes, noCites bool
 	cmd := &cobra.Command{
-		Use:     `versiculo "<referencia>"`,
-		Aliases: []string{"versículo", "v", "verse"},
-		Short:   "Texto TNM textual (edición de estudio) con notas, referencias marginales y quién lo cita",
-		Long: `Muestra el texto de la Traducción del Nuevo Mundo (edición de estudio, nwtsty) tal cual,
-con sus notas al pie, referencias marginales, notas de estudio y los documentos de la
-biblioteca que citan el pasaje (tabla BibleCitation de cada publicación sincronizada).
+		Use:     `verse "<reference>"`,
+		Aliases: []string{"versiculo", "versículo", "v"},
+		Short:   "The Bible text verbatim, with its notes, cross references and who cites it",
+		Long: `Prints the verses from the study Bible in your library exactly as they are, with
+their footnotes, marginal references and study notes, plus the documents in the
+library that cite the passage (the BibleCitation table of every synced publication).
 
-Acepta referencias en español: "Jer 38:6", "Jeremías 38:1-13", "1 Cor. 13:4-7",
-"Sal 23", "Jer 38:28-39:2", "Jer 38:6; 39:1, 4-6".`,
-		Example: `  pubkit versiculo "Jer 38:6"
-  pubkit versiculo "Jer 38:1-13" --sin-notas
-  pubkit versiculo "Juan 3:16" --citas 40 --json`,
+References are parsed in the library's language: "Jer 38:6", "Jeremiah 38:1-13",
+"1 Cor. 13:4-7", "Ps 23", "Jer 38:28-39:2", "Jer 38:6; 39:1, 4-6".`,
+		Example: `  pubkit verse "Jer 38:6"
+  pubkit verse "Jer 38:1-13" --no-notes
+  pubkit verse "John 3:16" --citations 40 --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ranges, err := bible.Parse(args[0])
+			// The library is opened first on purpose: that is what teaches the
+			// parser the book names of the languages it holds, so a reference
+			// written the way the user's own Bible writes it resolves.
+			st, err := a.store()
 			if err != nil {
 				return err
 			}
-			st, err := a.store()
+			ranges, err := bible.Parse(args[0])
 			if err != nil {
 				return err
 			}
 			if !st.HasBible() {
 				if a.offline {
-					return fmt.Errorf("la Biblia de estudio no está en la biblioteca: pubkit sync nwtsty")
+					return fmt.Errorf("no study Bible in the library: pubkit sync nwtsty")
 				}
-				a.logf("la Biblia de estudio (nwtsty, ~127 MB) no está en la biblioteca; sincronizando")
+				a.logf("no study Bible in the library (nwtsty, ~127 MB); syncing it")
 				if _, err := a.syncOne("nwtsty", "", false); err != nil {
 					return err
 				}
 			}
-			res := verseResult{Ref: bible.FormatList(ranges), Ranges: ranges, Translation: "Traducción del Nuevo Mundo (edición de estudio)"}
+			res := verseResult{Ref: bible.FormatList(ranges), Ranges: ranges, Translation: st.BibleTitle()}
 			for _, r := range ranges {
 				vs, err := st.Verses(r.FirstID(), r.LastID())
 				if err != nil {
 					return err
 				}
 				if len(vs) == 0 {
-					return fmt.Errorf("%s no está en la Biblia de la biblioteca", r.Long())
+					return fmt.Errorf("%s is not in the library's Bible", r.Long())
 				}
 				for i := range vs {
 					for j := range vs[i].XRefs {
@@ -85,8 +88,8 @@ Acepta referencias en español: "Jer 38:6", "Jeremías 38:1-13", "1 Cor. 13:4-7"
 				}
 			}
 			res.CitedTotal = len(res.CitedBy)
-			if citas > 0 && len(res.CitedBy) > citas {
-				res.CitedBy = res.CitedBy[:citas]
+			if citations > 0 && len(res.CitedBy) > citations {
+				res.CitedBy = res.CitedBy[:citations]
 			}
 			if noNotes {
 				for i := range res.Verses {
@@ -103,9 +106,9 @@ Acepta referencias en español: "Jer 38:6", "Jeremías 38:1-13", "1 Cor. 13:4-7"
 			return nil
 		},
 	}
-	cmd.Flags().IntVar(&citas, "citas", 25, "máximo de documentos que citan el pasaje a mostrar (0 = todos)")
-	cmd.Flags().BoolVar(&noNotes, "sin-notas", false, "omitir las notas de estudio")
-	cmd.Flags().BoolVar(&noCites, "sin-citas", false, "omitir los documentos que citan el pasaje")
+	cmd.Flags().IntVar(&citations, "citations", 25, "how many citing documents to show (0 = all)")
+	cmd.Flags().BoolVar(&noNotes, "no-notes", false, "leave out the study notes")
+	cmd.Flags().BoolVar(&noCites, "no-citations", false, "leave out the documents citing the passage")
 	return cmd
 }
 
@@ -144,7 +147,11 @@ func (a *app) printVerses(res verseResult, ranges []bible.Range) {
 	for _, r := range ranges {
 		heads = append(heads, r.Long())
 	}
-	p("%s · %s\n\n", strings.Join(heads, "; "), res.Translation)
+	if res.Translation != "" {
+		p("%s · %s\n\n", strings.Join(heads, "; "), res.Translation)
+	} else {
+		p("%s\n\n", strings.Join(heads, "; "))
+	}
 	multiChapter := false
 	for _, v := range res.Verses {
 		if v.Chapter != res.Verses[0].Chapter || v.Book != res.Verses[0].Book {
@@ -153,7 +160,7 @@ func (a *app) printVerses(res verseResult, ranges []bible.Range) {
 	}
 	label := func(v store.Verse) string {
 		if v.Verse == 0 {
-			return "(encabezado)"
+			return "(heading)"
 		}
 		if multiChapter || len(res.Verses) == 1 {
 			bk, _ := bible.BookByNum(v.Book)
@@ -187,13 +194,13 @@ func (a *app) printVerses(res verseResult, ranges []bible.Range) {
 			p("%s\n", l)
 		}
 	}
-	section("Notas al pie", fns, "(ninguna)")
-	section("Referencias marginales", xrefs, "(ninguna)")
-	section("Notas de estudio", notes, "(la edición de estudio no trae notas para este pasaje)")
+	section("Footnotes", fns, "(none)")
+	section("Marginal references", xrefs, "(none)")
+	section("Study notes", notes, "(this Bible carries no notes for the passage)")
 	if res.CitedTotal > 0 || len(res.CitedBy) > 0 {
-		p("\nCitado en %d documentos de la biblioteca", res.CitedTotal)
+		p("\nCited in %d documents in the library", res.CitedTotal)
 		if len(res.CitedBy) < res.CitedTotal {
-			p(" (primeros %d; usa --citas 0 para todos)", len(res.CitedBy))
+			p(" (first %d; use --citations 0 for all)", len(res.CitedBy))
 		}
 		p(":\n")
 		for _, c := range res.CitedBy {

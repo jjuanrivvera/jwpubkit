@@ -72,7 +72,7 @@ func (d *Doc) Markdown(opt RenderOptions) string {
 		case KindPara:
 			switch {
 			case b.Sub > 0:
-				line = fmt.Sprintf("**[núm. %d · párr. %d]** %s", b.Sub, b.Num, body)
+				line = fmt.Sprintf("**[sense %d · par. %d]** %s", b.Sub, b.Num, body)
 			case b.Num > 0:
 				line = fmt.Sprintf("**%d** %s", b.Num, body)
 			default:
@@ -229,23 +229,24 @@ func linkTarget(l *Link, opt RenderOptions) string {
 	return ""
 }
 
-// PlainText renders the document with the markers the preparation scripts
-// already use (totext.py): [H1] [H2] [H3] [PREGUNTA n] [IMAGEN ...].
+// PlainText renders the document with flat markers — [H1] [H2] [H3]
+// [QUESTION n] [IMAGE ...] [BOX] — for consumers that want the structure
+// without parsing Markdown.
 func (d *Doc) PlainText() string {
 	var out []string
 	for _, it := range d.Items {
 		if img := it.Image; img != nil {
-			parts := []string{"archivo=" + img.File}
+			parts := []string{"file=" + img.File}
 			if img.Alt != "" {
 				parts = append([]string{"alt=" + img.Alt}, parts...)
 			}
 			if img.Caption != "" {
-				parts = append(parts, "pie="+img.Caption)
+				parts = append(parts, "caption="+img.Caption)
 			}
 			if img.Video != nil {
 				parts = append(parts, "video="+img.Video.Key)
 			}
-			out = append(out, "[IMAGEN "+strings.Join(parts, " | ")+"]")
+			out = append(out, "[IMAGE "+strings.Join(parts, " | ")+"]")
 			continue
 		}
 		b := it.Block
@@ -263,13 +264,13 @@ func (d *Doc) PlainText() string {
 			if label == "" && b.Num > 0 {
 				label = fmt.Sprint(b.Num)
 			}
-			t = strings.TrimSpace(fmt.Sprintf("[PREGUNTA %s] %s", label, t))
-			t = strings.Replace(t, "[PREGUNTA ] ", "[PREGUNTA] ", 1)
+			t = strings.TrimSpace(fmt.Sprintf("[QUESTION %s] %s", label, t))
+			t = strings.Replace(t, "[QUESTION ] ", "[QUESTION] ", 1)
 		case KindTheme:
 			t = "[TEXTO TEMÁTICO] " + t
 		case KindItem:
 			if b.Answer {
-				t = "[PREGUNTA] " + t
+				t = "[QUESTION] " + t
 			} else {
 				t = "- " + t
 			}
@@ -280,16 +281,16 @@ func (d *Doc) PlainText() string {
 		case KindPara:
 			switch {
 			case b.Sub > 0:
-				t = fmt.Sprintf("[núm. %d · párr. %d] %s", b.Sub, b.Num, t)
+				t = fmt.Sprintf("[sense %d · par. %d] %s", b.Sub, b.Num, t)
 			case b.Num > 0:
 				t = fmt.Sprintf("%d %s", b.Num, t)
 			}
 			if b.Answer {
-				t = "[PREGUNTA] " + t
+				t = "[QUESTION] " + t
 			}
 		}
 		if b.InBox {
-			t = "[RECUADRO] " + t
+			t = "[BOX] " + t
 		}
 		out = append(out, t)
 	}

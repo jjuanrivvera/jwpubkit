@@ -3,8 +3,8 @@ MODULE := github.com/jjuanrivvera/jwpubkit
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X $(MODULE)/internal/cli.Version=$(VERSION)
 PREFIX ?= $(HOME)/.local/bin
-# El suelo de cobertura; el mismo número que .github/workflows/ci.yml.
-# Va por debajo de lo medido a propósito: el total baila ~1 punto entre máquinas.
+# The coverage floor; the same number as .github/workflows/ci.yml. It sits under the
+# measured total on purpose: that total drifts about a point between machines.
 COVER_MIN ?= 45
 
 .PHONY: build install test lint security verify cover-check clean
@@ -23,23 +23,23 @@ test:
 lint:
 	golangci-lint run ./...
 
-# La puerta. No modifica el árbol: si algo está mal, falla y lo dice.
+# The gate. It changes nothing: when something is wrong it fails and says so.
 verify: lint security
-	@test -z "$$(gofmt -l . | tee /dev/stderr)" || { echo 'gofmt: los archivos de arriba no están formateados'; exit 1; }
+	@test -z "$$(gofmt -l . | tee /dev/stderr)" || { echo 'gofmt: the files above are not formatted'; exit 1; }
 	go vet ./...
 	go test -coverprofile=coverage.out ./...
 	@$(MAKE) --no-print-directory cover-check
 
-# Lo mismo que corre el CI. Si gosec no está, lo dice en vez de callárselo: una
-# puerta que se salta un paso en silencio no es una puerta.
+# What CI runs. When gosec is missing it says so instead of skipping quietly: a gate
+# that silently drops a step is not a gate.
 security:
-	@command -v gosec >/dev/null || { echo 'gosec no está instalado (go install github.com/securego/gosec/v2/cmd/gosec@latest); el CI sí lo corre'; exit 1; }
+	@command -v gosec >/dev/null || { echo 'gosec is not installed (go install github.com/securego/gosec/v2/cmd/gosec@latest); CI runs it'; exit 1; }
 	gosec -severity high -confidence medium -quiet ./...
 
-# El mismo suelo que exige el CI, medido igual.
+# The same floor CI enforces, measured the same way.
 cover-check:
 	@total=$$(go tool cover -func=coverage.out | awk '/^total:/ {print substr($$3, 1, length($$3)-1)}'); \
-	awk -v t="$$total" -v min="$(COVER_MIN)" 'BEGIN { if (t+0 < min+0) { printf "cobertura %.1f%% < %s%%\n", t, min; exit 1 } printf "cobertura %.1f%% (mínimo %s%%)\n", t, min }'
+	awk -v t="$$total" -v min="$(COVER_MIN)" 'BEGIN { if (t+0 < min+0) { printf "coverage %.1f%% < %s%%\n", t, min; exit 1 } printf "coverage %.1f%% (floor %s%%)\n", t, min }'
 
 clean:
 	rm -rf bin dist coverage.out

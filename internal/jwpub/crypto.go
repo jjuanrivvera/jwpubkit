@@ -7,7 +7,7 @@
 // Copyright (c) 2025 Scheduling Workbox System. Meeting Media Manager
 // (github.com/sircharlo/meeting-media-manager, AGPL-3.0) was checked first: it
 // reads JWPUB databases but never decrypts Document.Content, so it could not
-// be the source. See README.md, "Créditos y licencias".
+// be the source. See README.md, "Credits".
 package jwpub
 
 import (
@@ -67,7 +67,7 @@ func NewCipher(c Card) Cipher {
 
 // ErrNotEncrypted is returned for blobs that are empty or not a whole number
 // of AES blocks.
-var ErrNotEncrypted = errors.New("jwpub: el blob no tiene el tamaño de un contenido cifrado")
+var ErrNotEncrypted = errors.New("jwpub: the blob is not the size of encrypted content")
 
 // Decrypt turns an encrypted content blob (Document.Content, BibleVerse.Content,
 // Extract.Content, ...) into the UTF-8 HTML it holds: AES-128-CBC with PKCS#7
@@ -84,11 +84,11 @@ func (ci Cipher) Decrypt(blob []byte) ([]byte, error) {
 	cipher.NewCBCDecrypter(block, ci.IV[:]).CryptBlocks(plain, blob)
 	pad := int(plain[len(plain)-1])
 	if pad == 0 || pad > aes.BlockSize || pad > len(plain) {
-		return nil, fmt.Errorf("jwpub: relleno PKCS#7 inválido (%d): ¿clave equivocada?", pad)
+		return nil, fmt.Errorf("jwpub: invalid PKCS#7 padding (%d): wrong key?", pad)
 	}
 	for _, b := range plain[len(plain)-pad:] {
 		if int(b) != pad {
-			return nil, errors.New("jwpub: relleno PKCS#7 inconsistente: ¿clave equivocada?")
+			return nil, errors.New("jwpub: inconsistent PKCS#7 padding: wrong key?")
 		}
 	}
 	zr, err := zlib.NewReader(bytes.NewReader(plain[:len(plain)-pad]))

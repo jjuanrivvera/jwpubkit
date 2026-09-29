@@ -224,7 +224,7 @@ func TestBuildChapterDossierNoItSynced(t *testing.T) {
 	}
 	found := false
 	for _, m := range d.NotInLib {
-		if strings.Contains(m, "Perspicacia") {
+		if strings.Contains(m, "(it) is not synced") {
 			found = true
 		}
 	}
@@ -285,17 +285,17 @@ func TestChapterDossierJSONShape(t *testing.T) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"referencia", "conteo_versiculos", "conteo_citas", "citas", "no_en_biblioteca"} {
+	for _, key := range []string{"reference", "verse_count", "citation_count", "citations", "not_in_library"} {
 		if _, ok := m[key]; !ok {
 			t.Fatalf("missing JSON key %q in %s", key, b)
 		}
 	}
-	cites, ok := m["citas"].([]any)
+	cites, ok := m["citations"].([]any)
 	if !ok || len(cites) != 1 {
-		t.Fatalf("citas shape: %s", b)
+		t.Fatalf("citations shape: %s", b)
 	}
 	first := cites[0].(map[string]any)
-	for _, key := range []string{"docid", "publicacion", "titulo", "versiculos", "extracto"} {
+	for _, key := range []string{"docid", "publication", "title", "verses", "extract"} {
 		if _, ok := first[key]; !ok {
 			t.Fatalf("missing citation JSON key %q in %s", key, b)
 		}

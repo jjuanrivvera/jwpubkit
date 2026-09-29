@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/jjuanrivvera/jwpubkit/internal/bible"
 )
 
 // SchemaVersion changes when the tables change; a mismatch rebuilds the
@@ -61,7 +63,34 @@ func Open(dir string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	s.teachBookNames()
 	return s, nil
+}
+
+// teachBookNames hands the bible package every language this library has seen a
+// Bible in, so references parse and print in the language of the publications
+// actually on disk. A library with no Bible simply leaves the built-in names.
+func (s *Store) teachBookNames() {
+	rows, err := s.DB.Query(`SELECT lang, book, name FROM book_name`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	byLang := map[string]map[int]string{}
+	for rows.Next() {
+		var lang, name string
+		var book int
+		if err := rows.Scan(&lang, &book, &name); err != nil {
+			return
+		}
+		if byLang[lang] == nil {
+			byLang[lang] = map[int]string{}
+		}
+		byLang[lang][book] = name
+	}
+	for lang, names := range byLang {
+		bible.Register(lang, names)
+	}
 }
 
 // Close closes the database.
@@ -69,6 +98,12 @@ func (s *Store) Close() error { return s.DB.Close() }
 
 func (s *Store) migrate() error {
 	if _, err := s.DB.Exec(`CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT)`); err != nil {
+		return err
+	}
+	// Tables that can simply be added never justify a rebuild: a schema bump drops
+	// the indexed content, and re-indexing a full library costs minutes the user
+	// did not ask for. They are created on every open and fill up on the next sync.
+	if _, err := s.DB.Exec(additiveSchema); err != nil {
 		return err
 	}
 	var v string
@@ -86,11 +121,21 @@ func (s *Store) migrate() error {
 		}
 	}
 	if _, err := s.DB.Exec(schema); err != nil {
-		return fmt.Errorf("creando el esquema: %w", err)
+		return fmt.Errorf("creating the schema: %w", err)
 	}
 	_, err = s.DB.Exec(`INSERT OR REPLACE INTO meta(key, value) VALUES('schema', ?)`, SchemaVersion)
 	return err
 }
+
+// additiveSchema holds tables that are safe to create on an existing library.
+const additiveSchema = `
+-- The book names of every Bible ever indexed, so references can be read and
+-- written in the library's own language instead of a table shipped per language.
+CREATE TABLE IF NOT EXISTS book_name(
+	lang TEXT NOT NULL, book INTEGER NOT NULL, name TEXT NOT NULL,
+	PRIMARY KEY(lang, book)
+);
+`
 
 const schema = `
 CREATE TABLE IF NOT EXISTS pub(

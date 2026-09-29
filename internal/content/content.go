@@ -34,35 +34,35 @@ const (
 
 // Link is an anchor inside a block.
 type Link struct {
-	Kind  string       `json:"tipo"` // biblia, pub, interno, video, web
-	Text  string       `json:"texto"`
+	Kind  string       `json:"kind"` // biblia, pub, interno, video, web
+	Text  string       `json:"text"`
 	Href  string       `json:"href"`
 	Bible *bible.Range `json:"biblia,omitempty"`
 	DocID int          `json:"docid,omitempty"`
-	Pars  string       `json:"parrafos,omitempty"` // "22-22", "17-17:159"
-	First int          `json:"parrafo_inicio,omitempty"`
-	Last  int          `json:"parrafo_fin,omitempty"`
+	Pars  string       `json:"paragraphs,omitempty"` // "22-22", "17-17:159"
+	First int          `json:"first_paragraph,omitempty"`
+	Last  int          `json:"last_paragraph,omitempty"`
 	Video *VideoRef    `json:"video,omitempty"`
 }
 
 // VideoRef points to a video in the mediator catalog.
 type VideoRef struct {
-	Key   string `json:"clave"` // "pub-jwb-125_4_VIDEO"
+	Key   string `json:"key"` // "pub-jwb-125_4_VIDEO"
 	Pub   string `json:"pub,omitempty"`
 	Issue string `json:"issue,omitempty"`
 	Track int    `json:"track,omitempty"`
 	DocID int    `json:"docid,omitempty"`
-	Title string `json:"titulo,omitempty"`
+	Title string `json:"title,omitempty"`
 }
 
 // Image is a figure of the document.
 type Image struct {
-	File    string    `json:"archivo"`
+	File    string    `json:"file"`
 	Alt     string    `json:"alt,omitempty"`
-	Caption string    `json:"pie,omitempty"`
-	Credit  string    `json:"credito,omitempty"`
-	Width   int       `json:"ancho,omitempty"`
-	Height  int       `json:"alto,omitempty"`
+	Caption string    `json:"caption,omitempty"`
+	Credit  string    `json:"credit,omitempty"`
+	Width   int       `json:"width,omitempty"`
+	Height  int       `json:"height,omitempty"`
 	PID     int       `json:"pid,omitempty"` // block right before the figure
 	Video   *VideoRef `json:"video,omitempty"`
 }
@@ -82,7 +82,7 @@ type Block struct {
 	Kind     string
 	Level    int    // heading level (1-4)
 	Num      int    // paragraph number as publications cite it, or question number
-	Sub      int    // numbered subentry of an Insight article ("núm. 2")
+	Sub      int    // numbered subentry of an encyclopedia article
 	Class    string // first class of the element: "sb", "sn", "qu"...
 	NumLabel string // "3, 4" for questions that cover two paragraphs
 	FnLabel  string // footnote letter
@@ -432,7 +432,7 @@ func parseLink(href, dataVideo, text string) *Link {
 	switch {
 	case strings.HasPrefix(href, "jwpub://b/"):
 		if r, ok := bible.ParseLink(href); ok {
-			l.Kind, l.Bible = "biblia", &r
+			l.Kind, l.Bible = "bible", &r
 			return l
 		}
 	case strings.HasPrefix(href, "jwpub://p/"):
@@ -499,8 +499,8 @@ func VideoKey(pub, issue string, track, docid int) string {
 var subentryRe = regexp.MustCompile(`^\d+\.$`)
 
 // numberSubentries numbers the paragraphs of Insight articles split into
-// "1.", "2."... senses. Publications cite them per sense ("núm. 2 párrs. 1, 2"
-// is data-pid 4-5 of "Madián"), and JW Library leaves such paragraphs without
+// "1.", "2."... senses. Publications cite them per sense, and the reader app
+// leaves such paragraphs without
 // a parNum, so the count restarts at every bold "N." that opens a paragraph.
 func (d *Doc) numberSubentries() {
 	sub, count := 0, 0
@@ -602,7 +602,7 @@ func (b *Block) trimLeading(n int) {
 var spaceRe = regexp.MustCompile(`[ \t\r\n]+`)
 
 // collapse squeezes ASCII whitespace but keeps no-break spaces, which are part
-// of the published text ("no había").
+// of the published text.
 func collapse(s string) string {
 	return strings.TrimSpace(spaceRe.ReplaceAllString(s, " "))
 }
@@ -620,7 +620,7 @@ func (b *Block) Text() string {
 func (b *Block) BibleRefs() []bible.Range {
 	var out []bible.Range
 	for _, l := range b.Links {
-		if l.Kind == "biblia" && l.Bible != nil {
+		if l.Kind == "bible" && l.Bible != nil {
 			out = append(out, *l.Bible)
 		}
 	}

@@ -17,20 +17,20 @@ import (
 
 // SyncResult reports what a sync did.
 type SyncResult struct {
-	Key        string        `json:"clave"`
-	Title      string        `json:"titulo"`
-	File       string        `json:"archivo"`
+	Key        string        `json:"key"`
+	Title      string        `json:"title"`
+	File       string        `json:"file"`
 	Size       int64         `json:"bytes"`
 	MD5        string        `json:"md5"`
-	Modified   string        `json:"modificado"`
-	Downloaded bool          `json:"descargado"`
-	Indexed    bool          `json:"indexado"`
-	UpToDate   bool          `json:"al_dia"`
+	Modified   string        `json:"modified"`
+	Downloaded bool          `json:"downloaded"`
+	Indexed    bool          `json:"indexed"`
+	UpToDate   bool          `json:"up_to_date"`
 	Download   time.Duration `json:"-"`
 	Stats      *IndexStats   `json:"-"`
-	Summary    string        `json:"resumen,omitempty"`
-	DownloadMS int64         `json:"descarga_ms"`
-	IndexMS    int64         `json:"indexado_ms"`
+	Summary    string        `json:"summary,omitempty"`
+	DownloadMS int64         `json:"download_ms"`
+	IndexMS    int64         `json:"indexed_ms"`
 }
 
 // NormalizeIssue accepts 202609, 20260900 or 2026-09 and returns what the
@@ -66,7 +66,7 @@ func (s *Store) Sync(ctx context.Context, c *cdn.Client, symbol, issue string, f
 	}
 	f, ok := pm.JWPUB(c.Lang)
 	if !ok {
-		return nil, fmt.Errorf("pub-media no devolvió un JWPUB para %s %s", symbol, issue)
+		return nil, fmt.Errorf("pub-media returned no JWPUB for %s %s", symbol, issue)
 	}
 	info := PubInfo{Symbol: symbol, Issue: issue, Lang: c.Lang, MD5: f.File.Checksum, Size: f.Filesize, Modified: f.File.ModifiedDatetime}
 	info.File = filepath.Join(s.PubsDir(), path.Base(f.File.URL))
@@ -125,8 +125,8 @@ func (s *Store) IndexLocal(file, symbol, issue, lang string) (*IndexStats, error
 	if err != nil {
 		return nil, err
 	}
-	// filepath.Base descarta cualquier ruta que traiga el nombre, así que la copia
-	// no puede salir de la carpeta de publicaciones.
+	// filepath.Base drops whatever path the name carries, so the copy cannot land
+	// outside the publications directory.
 	dest := filepath.Join(s.PubsDir(), filepath.Base(file))
 	if abs, _ := filepath.Abs(file); abs != dest {
 		if err := copyFile(file, dest); err != nil {
@@ -137,11 +137,11 @@ func (s *Store) IndexLocal(file, symbol, issue, lang string) (*IndexStats, error
 		Modified: st.ModTime().Format("2006-01-02 15:04:05")})
 }
 
-// copyFile copia en streaming: un .jwpub puede pesar cientos de megas y no hay razón
-// para tenerlo entero en memoria.
+// copyFile streams: a .jwpub can run to hundreds of megabytes and there is no
+// reason to hold one in memory.
 func copyFile(src, dest string) error {
-	// #nosec G304,G703 -- src es exactamente el archivo que el usuario nombró en
-	// --archivo; leerlo es lo que pidió el comando.
+	// #nosec G304,G703 -- src is exactly the file the user named in --file; reading
+	// it is what the command was asked to do.
 	in, err := os.Open(src)
 	if err != nil {
 		return err

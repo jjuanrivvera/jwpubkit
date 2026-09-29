@@ -15,9 +15,9 @@ import (
 type Cue struct {
 	Start time.Duration `json:"-"`
 	End   time.Duration `json:"-"`
-	From  string        `json:"inicio"`
-	To    string        `json:"fin"`
-	Text  string        `json:"texto"`
+	From  string        `json:"from"`
+	To    string        `json:"to"`
+	Text  string        `json:"text"`
 }
 
 var (
@@ -48,7 +48,7 @@ func ParseVTT(src string) ([]Cue, error) {
 			start, err1 := parseTS(m[1])
 			end, err2 := parseTS(m[2])
 			if err1 != nil || err2 != nil {
-				return nil, fmt.Errorf("tiempo inválido: %q", line)
+				return nil, fmt.Errorf("invalid timestamp: %q", line)
 			}
 			cur = &Cue{Start: start, End: end, From: FormatTS(start), To: FormatTS(end)}
 			continue
@@ -63,7 +63,7 @@ func ParseVTT(src string) ([]Cue, error) {
 	}
 	flush()
 	if len(cues) == 0 {
-		return nil, fmt.Errorf("el archivo de subtítulos no tiene texto")
+		return nil, fmt.Errorf("the subtitle file carries no text")
 	}
 	return cues, sc.Err()
 }
@@ -88,7 +88,7 @@ func parseTS(s string) (time.Duration, error) {
 		m, _ = strconv.Atoi(parts[0])
 		sec, err = strconv.ParseFloat(parts[1], 64)
 	default:
-		return 0, fmt.Errorf("tiempo inválido %q", s)
+		return 0, fmt.Errorf("invalid timestamp %q", s)
 	}
 	return time.Duration(h)*time.Hour + time.Duration(m)*time.Minute + time.Duration(sec*float64(time.Second)), err
 }

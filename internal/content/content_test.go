@@ -176,9 +176,9 @@ func TestPlainText(t *testing.T) {
 	txt := parse(t, studyArticle).PlainText()
 	for _, want := range []string{
 		"[H1] Un artículo de prueba",
-		"[PREGUNTA 1] ¿Primera pregunta?",
+		"[QUESTION 1] ¿Primera pregunta?",
 		"1 PRIMER párrafo con nota(a) y (lee 1 Timoteo 2:3, 4).",
-		"[IMAGEN alt=Descripción de la imagen. | archivo=2026999_univ_cnt_1.jpg | pie=Pie de la imagen.]",
+		"[IMAGE alt=Descripción de la imagen. | file=2026999_univ_cnt_1.jpg | caption=Pie de la imagen.]",
 		"[TEXTO TEMÁTICO]",
 		"[NOTA a] Texto de la nota.",
 	} {

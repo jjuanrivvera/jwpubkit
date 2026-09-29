@@ -7,14 +7,14 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    # misspell queda fuera a propósito: este código se documenta en español y el
-    # diccionario es de inglés, así que marca palabras correctas ("comando" por
-    # "commando"). La alternativa era una lista de excepciones que solo crece.
+    - misspell
     - revive
     - bodyclose
     - unconvert
     - nilerr
   settings:
+    misspell:
+      locale: US
     errcheck:
       exclude-functions:
         - fmt.Fprint
@@ -26,8 +26,10 @@ linters:
           disabled: true
   exclusions:
     rules:
+      # Fixtures carry publication-shaped text in other languages; an english
+      # dictionary has nothing useful to say about it.
       - path: _test\.go
-        linters: [errcheck]
+        linters: [misspell, errcheck]
       - path: '.*\.go'
         linters: [errcheck]
         text: '(Write|Print|Close|Remove|Mkdir|Sync|WriteString)'

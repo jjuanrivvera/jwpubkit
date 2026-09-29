@@ -36,7 +36,7 @@ var ErrNotFound = errors.New("no existe en la CDN")
 // Client is a small HTTP client with sane timeouts.
 type Client struct {
 	HTTP *http.Client
-	Lang string // "S" = español
+	Lang string // jw.org language symbol: "E", "S", "F"…
 }
 
 // New returns a client for language lang ("S").
@@ -96,7 +96,7 @@ func (c *Client) getJSON(ctx context.Context, u string, v any) error {
 		return err
 	}
 	if err := json.Unmarshal(b, v); err != nil {
-		return fmt.Errorf("respuesta inválida de %s: %w", u, err)
+		return fmt.Errorf("invalid response from %s: %w", u, err)
 	}
 	return nil
 }

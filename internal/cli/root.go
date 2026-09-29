@@ -14,13 +14,19 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
+	"github.com/jjuanrivvera/jwpubkit/internal/bible"
 	"github.com/jjuanrivvera/jwpubkit/internal/cdn"
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 )
 
 // Version is set at build time with -ldflags "-X github.com/jjuanrivvera/jwpubkit/internal/cli.Version=…".
 var Version = "dev"
+
+// defaultLang is the jw.org language symbol used when nothing else says otherwise.
+// E is English; every other language is reachable with --language.
+const defaultLang = "E"
 
 type app struct {
 	jsonOut bool
@@ -49,6 +55,35 @@ func Execute() int {
 	return 0
 }
 
+// legacyFlags maps the Spanish flag names this CLI shipped with to their current
+// names, so a script written against an older version keeps working.
+var legacyFlags = map[string]string{
+	"biblioteca":  "library",
+	"idioma":      "language",
+	"silencioso":  "quiet",
+	"sin-red":     "offline",
+	"archivo":     "file",
+	"biblia":      "bible",
+	"citas":       "citations",
+	"extractos":   "extracts",
+	"formato":     "format",
+	"forzar":      "force",
+	"limite":      "limit",
+	"listar":      "list",
+	"salida":      "output",
+	"sin-atalaya": "no-watchtower",
+	"sin-citas":   "no-citations",
+	"sin-notas":   "no-notes",
+	"tiempos":     "timings",
+}
+
+func normalizeFlag(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+	if current, ok := legacyFlags[name]; ok {
+		return pflag.NormalizedName(current)
+	}
+	return pflag.NormalizedName(name)
+}
+
 func (a *app) rootCmd() *cobra.Command {
 	name := filepath.Base(os.Args[0])
 	name = strings.TrimSuffix(name, filepath.Ext(name))
@@ -57,15 +92,15 @@ func (a *app) rootCmd() *cobra.Command {
 	}
 	root := &cobra.Command{
 		Use:   name,
-		Short: "Lee publicaciones en formato JWPUB desde una biblioteca local",
-		Long: `` + name + ` descarga publicaciones en formato JWPUB desde la CDN abierta de jw.org,
-las descifra y las indexa en una biblioteca local (SQLite + FTS5) para consultar la
-reunión de la semana, pasajes bíblicos con sus notas, búsquedas, documentos completos,
-imágenes y subtítulos de videos.
+		Short: "Read JWPUB publications from a local library",
+		Long: `` + name + ` downloads publications in JWPUB format from the open jw.org CDN,
+decrypts them and indexes them into a local library (SQLite + FTS5) you can query
+offline: the week's meeting, Bible passages with their notes, full-text search,
+whole documents, images and video subtitles.
 
-No redistribuye ninguna publicación: trabaja con lo que tú descargas, en tu máquina.
+It redistributes nothing: it works on what you downloaded, on your machine.
 
-Biblioteca: ~/.local/share/jwlib (cámbiala con --biblioteca, JWPUBKIT_HOME o JWLIB_HOME).`,
+Library: ~/.local/share/jwlib (change it with --library, JWPUBKIT_HOME or JWLIB_HOME).`,
 		Version:       Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -76,14 +111,24 @@ Biblioteca: ~/.local/share/jwlib (cámbiala con --biblioteca, JWPUBKIT_HOME o JW
 			return nil
 		},
 	}
+	root.SetGlobalNormalizationFunc(normalizeFlag)
 	pf := root.PersistentFlags()
-	pf.BoolVar(&a.jsonOut, "json", false, "salida en JSON")
-	pf.StringVar(&a.libDir, "biblioteca", store.DefaultDir(), "carpeta de la biblioteca local")
-	pf.BoolVar(&a.offline, "sin-red", false, "no usar la red (no sincroniza ni consulta la CDN)")
-	pf.StringVar(&a.lang, "idioma", "S", "idioma de las publicaciones (código de jw.org; S = español)")
-	pf.BoolVarP(&a.quiet, "silencioso", "q", false, "no mostrar progreso en stderr")
-	root.AddCommand(a.syncCmd(), a.semanaCmd(), a.versiculoCmd(), a.buscarCmd(), a.docCmd(), a.imagenCmd(), a.subtitulosCmd(), a.pubsCmd(), a.expedienteCmd(), a.completionCmd(), a.versionCmd())
+	pf.BoolVar(&a.jsonOut, "json", false, "output JSON")
+	pf.StringVar(&a.libDir, "library", store.DefaultDir(), "local library directory")
+	pf.BoolVar(&a.offline, "offline", false, "stay off the network (no sync, no CDN lookups)")
+	pf.StringVar(&a.lang, "language", langDefault(), "publication language (jw.org symbol: E english, S spanish, F french…)")
+	pf.BoolVarP(&a.quiet, "quiet", "q", false, "do not print progress on stderr")
+	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.completionCmd(), a.versionCmd())
 	return root
+}
+
+// langDefault lets a library that holds one language say so once, in the
+// environment, instead of every command line repeating --language.
+func langDefault() string {
+	if l := os.Getenv("JWPUBKIT_LANG"); l != "" {
+		return l
+	}
+	return defaultLang
 }
 
 func (a *app) store() (*store.Store, error) {
@@ -92,8 +137,11 @@ func (a *app) store() (*store.Store, error) {
 	}
 	st, err := store.Open(a.libDir)
 	if err != nil {
-		return nil, fmt.Errorf("abriendo la biblioteca %s: %w", a.libDir, err)
+		return nil, fmt.Errorf("opening the library %s: %w", a.libDir, err)
 	}
+	// Opening the library teaches the bible package the names of every language
+	// it holds a Bible in; this picks which of them references are printed in.
+	bible.UseLanguage(a.lang)
 	a.st = st
 	return st, nil
 }
@@ -105,7 +153,7 @@ func (a *app) client() *cdn.Client {
 	return a.cdn
 }
 
-// logf prints progress on stderr unless --silencioso.
+// logf prints progress on stderr unless --quiet.
 func (a *app) logf(format string, args ...any) {
 	if a.quiet {
 		return
@@ -122,7 +170,7 @@ func (a *app) printJSON(v any) error {
 
 func (a *app) printf(format string, args ...any) { fmt.Fprintf(a.out, format, args...) }
 
-var errOffline = errors.New("hace falta la red y se pidió --sin-red")
+var errOffline = errors.New("this needs the network and --offline was given")
 
 // syncOne syncs a publication, printing progress.
 func (a *app) syncOne(symbol, issue string, force bool) (*store.SyncResult, error) {
@@ -140,9 +188,9 @@ func ms(d time.Duration) string {
 	if d < time.Second {
 		return fmt.Sprintf("%d ms", d.Milliseconds())
 	}
-	return strings.Replace(fmt.Sprintf("%.1f s", d.Seconds()), ".", ",", 1)
+	return fmt.Sprintf("%.1f s", d.Seconds())
 }
 
 func mb(n int64) string {
-	return strings.Replace(fmt.Sprintf("%.1f MB", float64(n)/1e6), ".", ",", 1)
+	return fmt.Sprintf("%.1f MB", float64(n)/1e6)
 }

@@ -13,11 +13,10 @@ jobs:
   ci:
     uses: jjuanrivvera/.github/.github/workflows/go-ci.yml@main
     with:
-      # Medido, no aspiracional: el total ronda el 50% (internal/cli va por 21% y
-      # cdn sin cubrir) y baila un punto entre runners, así que la puerta va debajo.
-      # Es un trinquete: súbelo al cubrir la capa de comandos.
+      # Measured, not aspirational: the total sits around 50% (internal/cli near 21%,
+      # cdn uncovered) and drifts a point between runners, so the gate sits under it.
+      # It is a ratchet: raise it as the command layer gets covered.
       coverage-threshold: "45"
       run-gosec: true
-      # No hay tools/gendocs todavía, así que no hay documentación generada que
-      # pueda desincronizarse.
+      # There is no tools/gendocs yet, so no generated documentation can drift.
       run-docs-check: false

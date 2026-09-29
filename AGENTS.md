@@ -1,42 +1,63 @@
-# AGENTS.md — trabajar en jwpubkit
+# AGENTS.md — working on jwpubkit
 
-`pubkit` lee bibliotecas JWPUB: descarga publicaciones de la CDN abierta de jw.org, las
-descifra y las indexa en SQLite + FTS5 para consultarlas sin conexión. Este archivo orienta a
-quien contribuya, humano o agente.
+`pubkit` reads JWPUB libraries: it downloads publications from the open jw.org CDN, decrypts
+them and indexes them into SQLite + FTS5 so they can be queried offline. This file orients
+whoever contributes, human or agent.
 
-## La regla que manda
+## The rule that governs
 
-**El repositorio no contiene publicaciones.** Ni texto, ni imágenes, ni audio, ni bases de
-datos — tampoco en pruebas ni en fixtures. Todo dato de prueba es inventado con la *forma* del
-marcado real. La única excepción son unos pocos encabezados de sección que el analizador usa
-como claves del formato (`internal/meeting/meeting.go`): sin nombrarlos no puede reconocer las
-partes de la reunión. Antes de añadir un fixture, pregúntate si el texto podría venir de una
-publicación; si la respuesta no es un no rotundo, invéntalo.
+**The repository holds no publications.** No text, no images, no audio, no databases — not in
+tests and not in fixtures either. Every test fixture is invented, in the *shape* of the real
+markup. The one exception is a handful of section headings the parser uses as keys of the
+format (`internal/meeting/meeting.go`): without naming them it cannot tell the parts of the
+meeting apart. Before adding a fixture, ask whether the text could have come from a
+publication; if the answer is anything but a flat no, invent it.
 
-## La puerta
+## The gate
 
-**`make verify`.** Formato, `go vet`, `golangci-lint`, las pruebas y el suelo de cobertura
-(`COVER_MIN`, hoy 50%, el mismo número que `.github/workflows/ci.yml`). Un cambio está hecho
-cuando sale `0`. El suelo es un trinquete: súbelo cuando cubras más, nunca lo bajes.
+**`make verify`.** Formatting, `go vet`, `golangci-lint`, `gosec`, the tests and the coverage
+floor (`COVER_MIN`, the same number as `.github/workflows/ci.yml`). A change is done when it
+exits `0`. The floor is a ratchet: raise it as coverage grows, never lower it.
 
-## Dónde está cada cosa
+## Language
 
-- `internal/cdn` — descarga desde la CDN de jw.org y el catálogo de publicaciones.
-- `internal/jwpub` — el formato: zip dentro de zip, SQLite dentro, y el descifrado
-  AES-128-CBC + zlib del contenido de cada documento.
-- `internal/store` — la biblioteca: esquema SQLite, índice FTS5 y las consultas.
-- `internal/content` — de HTML de publicación a texto, markdown o JSON.
-- `internal/bible` — referencias bíblicas: análisis, rangos y numeración de libros.
-- `internal/meeting` — arma la reunión de la semana a partir de los documentos indexados.
-- `internal/subs` — subtítulos de video.
-- `internal/cli` — el árbol de cobra. Un archivo por comando.
+The CLI speaks English: commands, flags, help, errors, output labels and JSON keys. What comes
+out of a publication stays in the publication's language — that is data, not interface.
 
-## Reglas de la casa
+Publications are fetched in the language of `--language` (jw.org symbols: `E`, `S`, `F`…),
+default `E`, overridable once with `JWPUBKIT_LANG`.
 
-- Los comentarios explican **por qué**, no qué.
-- Pasa `cmd.Context()` a todo lo que haga red o SQL; nunca `context.Background()`.
-- La biblioteca vive en `~/.local/share/jwlib` por compatibilidad con instalaciones
-  anteriores; `JWPUBKIT_HOME` tiene prioridad y `JWLIB_HOME` sigue funcionando.
-- El binario es `pubkit` y `jwlib` queda como enlace simbólico (`make install`).
-- El driver de SQLite es `modernc.org/sqlite`, en Go puro: se compila sin cgo y cruza a
-  darwin y windows sin toolchain.
+Two layers know about languages, and they are not the same:
+
+- **Book names.** English and Spanish ship built in. Every other language is *learned*: when a
+  Bible is indexed, `BibleBook.ChapterDisplayTitle` is stored in `book_name` and handed to the
+  `bible` package on open. References parse in any known language and print in the chosen one.
+- **Workbook markup.** `internal/meeting` finds the parts of a week by matching the headings the
+  publication uses, so it only works for the languages in `meeting.ParsedLanguages` (today: `S`).
+  Any other language still gets the parts and their text; the derived fields come back empty and
+  `week` says so in its notes. Adding a language means teaching those matches.
+
+The Spanish command and flag names the CLI shipped with are kept as aliases
+(`internal/cli/root.go`), so scripts written against an older version keep working.
+
+## Where things live
+
+- `internal/cdn` — downloads from the jw.org CDN and the publication catalogue.
+- `internal/jwpub` — the format: a zip inside a zip, SQLite inside that, and the AES-128-CBC +
+  zlib decryption of each document's content.
+- `internal/store` — the library: SQLite schema, the FTS5 index and the queries.
+- `internal/content` — publication HTML to text, markdown or JSON.
+- `internal/bible` — Bible references: parsing, ranges, book names and verse numbering.
+- `internal/meeting` — assembles the week's meeting from the indexed documents.
+- `internal/subs` — video subtitles.
+- `internal/cli` — the cobra tree. One file per command.
+
+## House rules
+
+- Comments explain **why**, not what.
+- Pass `cmd.Context()` into anything that touches the network or SQL; never `context.Background()`.
+- The library lives at `~/.local/share/jwlib` for compatibility with earlier installs;
+  `JWPUBKIT_HOME` wins and `JWLIB_HOME` still works.
+- The binary is `pubkit`, with `jwlib` as a symlink (`make install`).
+- The SQLite driver is `modernc.org/sqlite`, pure Go: it builds without cgo and cross-compiles
+  to darwin and windows with no C toolchain.

@@ -11,22 +11,22 @@ import (
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 )
 
-func (a *app) buscarCmd() *cobra.Command {
+func (a *app) searchCmd() *cobra.Command {
 	var pubs string
 	var limit int
 	var withBible bool
 	cmd := &cobra.Command{
-		Use:     `buscar "<consulta>"`,
-		Aliases: []string{"search", "s"},
-		Short:   "Búsqueda de texto completo (FTS5) en la biblioteca",
-		Long: `Busca en el texto descifrado de todas las publicaciones sincronizadas. Todas las
-palabras deben aparecer en el mismo párrafo; las tildes no importan; "entre comillas"
-busca la frase exacta y palabra* busca por prefijo. Devuelve el mejor párrafo de cada
-documento: docid, publicación, título, párrafo y extracto.`,
-		Example: `  pubkit buscar "Ébed-Mélec"
-  pubkit buscar "cisterna" --pub it,w
-  pubkit buscar "\"conocimiento exacto\"" --limite 10
-  pubkit buscar "fango cisterna" --biblia`,
+		Use:     `search "<query>"`,
+		Aliases: []string{"buscar", "s"},
+		Short:   "Full-text search (FTS5) across the library",
+		Long: `Searches the decrypted text of every synced publication. All the words must land in
+the same paragraph; accents are ignored; "in quotes" matches the exact phrase and
+word* matches by prefix. Returns the best paragraph of each document: docid,
+publication, title, paragraph and snippet.`,
+		Example: `  pubkit search "cistern"
+  pubkit search "cistern" --pub it,w
+  pubkit search "\"accurate knowledge\"" --limit 10
+  pubkit search "mire cistern" --bible`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.store()
@@ -56,29 +56,29 @@ documento: docid, publicación, título, párrafo y extracto.`,
 				if verses == nil {
 					verses = []store.VerseHit{}
 				}
-				return a.printJSON(map[string]any{"consulta": args[0], "fts": store.FTSQuery(args[0]), "documentos": hits, "versiculos": verses})
+				return a.printJSON(map[string]any{"query": args[0], "fts": store.FTSQuery(args[0]), "documents": hits, "verses": verses})
 			}
 			if len(hits) == 0 && len(verses) == 0 {
 				pl, _ := st.Pubs()
 				if len(pl) == 0 {
-					return errors.New("la biblioteca está vacía: sincroniza algo primero (pubkit sync it w nwtsty)")
+					return errors.New("the library is empty: sync something first (pubkit sync it w nwtsty)")
 				}
-				a.printf("Sin resultados para %q en %d publicaciones.\n", args[0], len(pl))
+				a.printf("Nothing found for %q in %d publications.\n", args[0], len(pl))
 				return nil
 			}
 			for _, h := range hits {
 				par := fmt.Sprintf("pid %d", h.PID)
 				if h.Num > 0 {
-					par += fmt.Sprintf(", párr. %d", h.Num)
+					par += fmt.Sprintf(", par. %d", h.Num)
 				}
 				a.printf("%-11d %-7s %s (%s", h.DocID, h.Pub, h.Title, par)
 				if h.Matches > 1 {
-					a.printf(", %d párrafos coinciden", h.Matches)
+					a.printf(", %d paragraphs match", h.Matches)
 				}
 				a.printf(")\n            %s\n", h.Snippet)
 			}
 			if len(verses) > 0 {
-				a.printf("\nVersículos (TNM):\n")
+				a.printf("\nBible verses:\n")
 				for _, v := range verses {
 					bk, _ := bible.BookByNum(v.Book)
 					a.printf("  %s %d:%d  %s\n", bk.Short, v.Chapter, v.Verse, v.Snippet)
@@ -87,8 +87,8 @@ documento: docid, publicación, título, párrafo y extracto.`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&pubs, "pub", "", "limitar a publicaciones (símbolos separados por coma: it,w,w13,nwtsty,mwb)")
-	cmd.Flags().IntVar(&limit, "limite", 20, "máximo de documentos")
-	cmd.Flags().BoolVar(&withBible, "biblia", false, "buscar también en el texto de la Biblia")
+	cmd.Flags().StringVar(&pubs, "pub", "", "limit to publications (comma-separated symbols: it,w,w13,nwtsty,mwb)")
+	cmd.Flags().IntVar(&limit, "limit", 20, "maximum number of documents")
+	cmd.Flags().BoolVar(&withBible, "bible", false, "search the Bible text as well")
 	return cmd
 }

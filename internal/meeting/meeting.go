@@ -15,158 +15,158 @@ import (
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 )
 
-// Week is everything `pubkit semana` reports.
+// Week is everything `pubkit week` reports.
 type Week struct {
-	Monday            string        `json:"lunes"`
-	Range             string        `json:"rango"`
-	Workbook          *DocRef       `json:"guia"`
-	WeeklyReading     *Reading      `json:"lectura_semanal,omitempty"`
-	StudentReading    *Assignment   `json:"lectura_estudiante,omitempty"`
-	Songs             []Song        `json:"canciones"`
-	Sections          []Section     `json:"secciones"`
+	Monday            string        `json:"monday"`
+	Range             string        `json:"range"`
+	Workbook          *DocRef       `json:"workbook"`
+	WeeklyReading     *Reading      `json:"weekly_reading,omitempty"`
+	StudentReading    *Assignment   `json:"student_reading,omitempty"`
+	Songs             []Song        `json:"songs"`
+	Sections          []Section     `json:"sections"`
 	Videos            []Video       `json:"videos"`
-	Images            []Image       `json:"imagenes"`
-	Watchtower        *Watchtower   `json:"atalaya,omitempty"`
-	Notes             []string      `json:"avisos,omitempty"`
+	Images            []Image       `json:"images"`
+	Watchtower        *Watchtower   `json:"watchtower,omitempty"`
+	Notes             []string      `json:"notes,omitempty"`
 	CongregationStudy *StudyChapter `json:"-"`
 }
 
 // DocRef identifies a document.
 type DocRef struct {
 	DocID    int    `json:"docid"`
-	Pub      string `json:"publicacion"`
-	Key      string `json:"clave"`
-	Title    string `json:"titulo"`
-	Location string `json:"ubicacion,omitempty"`
+	Pub      string `json:"publication"`
+	Key      string `json:"key"`
+	Title    string `json:"title"`
+	Location string `json:"location,omitempty"`
 	URL      string `json:"url"`
 }
 
 // Reading is the weekly Bible reading.
 type Reading struct {
-	Text     string        `json:"texto"`
-	Book     string        `json:"libro"`
-	BookNum  int           `json:"libro_num"`
-	Chapters []int         `json:"capitulos"`
-	Ranges   []bible.Range `json:"rangos"`
-	Ref      string        `json:"cita"`
+	Text     string        `json:"text"`
+	Book     string        `json:"book"`
+	BookNum  int           `json:"book_number"`
+	Chapters []int         `json:"chapters"`
+	Ranges   []bible.Range `json:"ranges"`
+	Ref      string        `json:"reference"`
 }
 
 // Assignment is the student Bible reading.
 type Assignment struct {
-	Ref    string       `json:"cita"`
-	Range  *bible.Range `json:"rango,omitempty"`
-	Lesson *Reference   `json:"leccion,omitempty"`
+	Ref    string       `json:"reference"`
+	Range  *bible.Range `json:"range,omitempty"`
+	Lesson *Reference   `json:"lesson,omitempty"`
 }
 
 // Song of the meeting.
 type Song struct {
-	Number int    `json:"numero"`
-	Title  string `json:"titulo,omitempty"`
+	Number int    `json:"number"`
+	Title  string `json:"title,omitempty"`
 	DocID  int    `json:"docid,omitempty"`
-	When   string `json:"momento"` // inicio, medio, final
+	When   string `json:"when"` // start, middle, end
 	Video  string `json:"video"`
 }
 
 // Section groups the parts under one of the workbook's top-level headings.
 type Section struct {
-	Title string `json:"titulo"`
-	Parts []Part `json:"partes"`
+	Title string `json:"title"`
+	Parts []Part `json:"parts"`
 }
 
 // Part of the meeting.
 type Part struct {
-	Number     int           `json:"numero,omitempty"`
-	Title      string        `json:"titulo"`
-	Minutes    int           `json:"minutos,omitempty"`
+	Number     int           `json:"number,omitempty"`
+	Title      string        `json:"title"`
+	Minutes    int           `json:"minutes,omitempty"`
 	PID        int           `json:"pid"`
-	Text       []string      `json:"texto,omitempty"`
-	Questions  []string      `json:"preguntas,omitempty"`
-	References []Reference   `json:"referencias,omitempty"`
+	Text       []string      `json:"text,omitempty"`
+	Questions  []string      `json:"questions,omitempty"`
+	References []Reference   `json:"references,omitempty"`
 	Videos     []Video       `json:"videos,omitempty"`
-	Images     []Image       `json:"imagenes,omitempty"`
-	Study      *StudyChapter `json:"estudio,omitempty"`
+	Images     []Image       `json:"images,omitempty"`
+	Study      *StudyChapter `json:"study,omitempty"`
 	lastPID    int
 }
 
 // Reference is a Bible citation or a publication reference of a part.
 type Reference struct {
-	Kind      string       `json:"tipo"` // biblia, publicacion
-	Text      string       `json:"texto"`
-	Ref       string       `json:"cita,omitempty"`
-	Range     *bible.Range `json:"rango,omitempty"`
+	Kind      string       `json:"kind"` // bible, publication
+	Text      string       `json:"text"`
+	Ref       string       `json:"reference,omitempty"`
+	Range     *bible.Range `json:"range,omitempty"`
 	DocID     int          `json:"docid,omitempty"`
-	Pars      string       `json:"parrafos,omitempty"`
-	Location  string       `json:"ubicacion,omitempty"`
-	Title     string       `json:"titulo,omitempty"`
-	Pub       string       `json:"publicacion,omitempty"`
-	InLibrary bool         `json:"en_biblioteca"`
+	Pars      string       `json:"paragraphs,omitempty"`
+	Location  string       `json:"location,omitempty"`
+	Title     string       `json:"title,omitempty"`
+	Pub       string       `json:"publication,omitempty"`
+	InLibrary bool         `json:"in_library"`
 	Sync      string       `json:"sync,omitempty"`
-	Extract   string       `json:"extracto,omitempty"`
+	Extract   string       `json:"extract,omitempty"`
 	URL       string       `json:"url,omitempty"`
 }
 
 // Video mentioned by the meeting.
 type Video struct {
-	Key      string `json:"clave"`
-	Title    string `json:"titulo,omitempty"`
-	Duration string `json:"duracion,omitempty"`
-	Part     string `json:"parte,omitempty"`
-	Command  string `json:"subtitulos"`
+	Key      string `json:"key"`
+	Title    string `json:"title,omitempty"`
+	Duration string `json:"duration,omitempty"`
+	Part     string `json:"part,omitempty"`
+	Command  string `json:"subtitles_command"`
 }
 
 // Image of the meeting material.
 type Image struct {
-	File    string `json:"archivo"`
+	File    string `json:"file"`
 	Alt     string `json:"alt,omitempty"`
-	Caption string `json:"pie,omitempty"`
-	Width   int    `json:"ancho,omitempty"`
-	Height  int    `json:"alto,omitempty"`
+	Caption string `json:"caption,omitempty"`
+	Width   int    `json:"width,omitempty"`
+	Height  int    `json:"height,omitempty"`
 	DocID   int    `json:"docid"`
-	Part    string `json:"parte,omitempty"`
+	Part    string `json:"part,omitempty"`
 }
 
 // StudyChapter is the chapter of the congregation Bible study, read from the
 // extract the workbook ships (the whole chapter, questions included).
 type StudyChapter struct {
 	DocID      int             `json:"docid"`
-	Pub        string          `json:"publicacion"`
-	Location   string          `json:"ubicacion"`
-	Label      string          `json:"capitulo"` // "10 MOISÉS"
-	Title      string          `json:"titulo"`
-	Accounts   []string        `json:"relatos_biblicos,omitempty"`
-	Groups     []QuestionGroup `json:"preguntas,omitempty"`
-	References []Reference     `json:"referencias,omitempty"`
+	Pub        string          `json:"publication"`
+	Location   string          `json:"location"`
+	Label      string          `json:"chapter"` // the chapter number and name
+	Title      string          `json:"title"`
+	Accounts   []string        `json:"accounts,omitempty"`
+	Groups     []QuestionGroup `json:"questions,omitempty"`
+	References []Reference     `json:"references,omitempty"`
 	Videos     []Video         `json:"videos,omitempty"`
-	Images     []Image         `json:"imagenes,omitempty"`
-	Paragraphs int             `json:"parrafos"`
+	Images     []Image         `json:"images,omitempty"`
+	Paragraphs int             `json:"paragraphs"`
 }
 
 // QuestionGroup is a heading together with the questions listed under it.
 type QuestionGroup struct {
-	Title     string   `json:"titulo"`
-	Questions []string `json:"preguntas"`
+	Title     string   `json:"title"`
+	Questions []string `json:"questions"`
 }
 
 // Watchtower is the study article of the week.
 type Watchtower struct {
 	DocRef
-	Date      string          `json:"fecha"`
-	Theme     string          `json:"texto_tematico,omitempty"`
-	ThemeRef  string          `json:"cita_tematica,omitempty"`
-	Summary   string          `json:"tema,omitempty"`
-	Songs     []Song          `json:"canciones,omitempty"`
-	Questions []StudyQuestion `json:"preguntas"`
-	Boxes     []QuestionGroup `json:"recuadros,omitempty"`
-	Review    []string        `json:"repaso,omitempty"`
-	Images    []Image         `json:"imagenes,omitempty"`
-	Footnotes []string        `json:"notas,omitempty"`
+	Date      string          `json:"date"`
+	Theme     string          `json:"theme_text,omitempty"`
+	ThemeRef  string          `json:"theme_reference,omitempty"`
+	Summary   string          `json:"theme,omitempty"`
+	Songs     []Song          `json:"songs,omitempty"`
+	Questions []StudyQuestion `json:"questions"`
+	Boxes     []QuestionGroup `json:"boxes,omitempty"`
+	Review    []string        `json:"review,omitempty"`
+	Images    []Image         `json:"images,omitempty"`
+	Footnotes []string        `json:"footnotes,omitempty"`
 }
 
 // StudyQuestion of a study article.
 type StudyQuestion struct {
-	Paragraphs string `json:"parrafos"`
-	Text       string `json:"texto"`
-	Subheading string `json:"subtitulo,omitempty"`
+	Paragraphs string `json:"paragraphs"`
+	Text       string `json:"text"`
+	Subheading string `json:"subheading,omitempty"`
 }
 
 // Monday returns the Monday of the week that contains day.
@@ -252,7 +252,7 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 		byLink[e.Link] = e
 	}
 	refFor := func(l *content.Link) Reference {
-		r := Reference{Kind: "publicacion", Text: l.Text, DocID: l.DocID, Pars: l.Pars, URL: content.WolDocURL(l.DocID, l.First)}
+		r := Reference{Kind: "publication", Text: l.Text, DocID: l.DocID, Pars: l.Pars, URL: content.WolDocURL(l.DocID, l.First)}
 		if e, ok := byLink[strings.TrimPrefix(l.Href, "jwpub://")]; ok {
 			r.Location, r.Title, r.Pub = e.Caption, e.Title, e.RefSymbol
 			r.Extract = extractText(e.HTML)
@@ -270,11 +270,11 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 	whenOf := func(i int) string {
 		switch i {
 		case 0:
-			return "inicio"
+			return "start"
 		case 1:
-			return "medio"
+			return "middle"
 		default:
-			return "final"
+			return "end"
 		}
 	}
 	flush := func() {
@@ -347,15 +347,15 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 		}
 		for _, l := range blk.Links {
 			switch {
-			case l.Kind == "biblia" && l.Bible != nil:
+			case l.Kind == "bible" && l.Bible != nil:
 				r := *l.Bible
-				part.References = append(part.References, Reference{Kind: "biblia", Text: l.Text, Ref: r.String(), Range: &r})
+				part.References = append(part.References, Reference{Kind: "bible", Text: l.Text, Ref: r.String(), Range: &r})
 			case l.Kind == "pub" && l.DocID != 0 && l.DocID != docid:
 				part.References = append(part.References, refFor(l))
 			}
 		}
 		for _, v := range blk.Videos {
-			vid := Video{Key: v.Key, Title: videoTitle(v.Title), Part: part.label(), Command: "pubkit subtitulos " + v.Key}
+			vid := Video{Key: v.Key, Title: videoTitle(v.Title), Part: part.label(), Command: "pubkit subtitles " + v.Key}
 			part.Videos = append(part.Videos, vid)
 			w.Videos = append(w.Videos, vid)
 		}
@@ -407,7 +407,7 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 				w.StudentReading = studentReading(p)
 			case strings.Contains(low, "estudio bíblico de la congregación"):
 				for _, r := range p.References {
-					if r.Kind != "publicacion" {
+					if r.Kind != "publication" {
 						continue
 					}
 					for _, e := range extracts {
@@ -508,14 +508,32 @@ func weeklyReading(text string, refs []bible.Range) *Reading {
 	return r
 }
 
+// ParsedLanguages are the languages whose workbook markup this package knows how
+// to take apart. The structure of a week — which part is the Bible reading, which
+// is the congregation study — is announced in the publication's own words, and
+// those words are matched below, so a language that is not listed here yields the
+// parts and their text but leaves the derived fields empty. Adding a language is
+// a matter of teaching those matches, not of rewriting the parser.
+var ParsedLanguages = []string{"S"}
+
+// Parses reports whether the meeting parser knows this language's markup.
+func Parses(lang string) bool {
+	for _, l := range ParsedLanguages {
+		if l == lang {
+			return true
+		}
+	}
+	return false
+}
+
 func studentReading(p *Part) *Assignment {
 	a := &Assignment{}
 	for i := range p.References {
 		r := &p.References[i]
 		switch {
-		case r.Kind == "biblia" && a.Range == nil:
+		case r.Kind == "bible" && a.Range == nil:
 			a.Ref, a.Range = r.Ref, r.Range
-		case r.Kind == "publicacion" && a.Lesson == nil:
+		case r.Kind == "publication" && a.Lesson == nil:
 			a.Lesson = r
 		}
 	}
@@ -609,12 +627,12 @@ func studyChapter(e store.Extract) (*StudyChapter, error) {
 		}
 		for _, l := range blk.Links {
 			if l.Kind == "pub" && l.DocID != 0 && l.DocID != e.RefDocID {
-				sc.References = append(sc.References, Reference{Kind: "publicacion", Text: l.Text, DocID: l.DocID, Pars: l.Pars,
+				sc.References = append(sc.References, Reference{Kind: "publication", Text: l.Text, DocID: l.DocID, Pars: l.Pars,
 					URL: content.WolDocURL(l.DocID, l.First)})
 			}
 		}
 		for _, v := range blk.Videos {
-			sc.Videos = append(sc.Videos, Video{Key: v.Key, Title: videoTitle(v.Title), Command: "pubkit subtitulos " + v.Key})
+			sc.Videos = append(sc.Videos, Video{Key: v.Key, Title: videoTitle(v.Title), Command: "pubkit subtitles " + v.Key})
 		}
 	}
 	// Keep only groups that ask something.
@@ -679,9 +697,9 @@ func (b *Builder) BuildWatchtower(w *Week, docid int) error {
 			if len(blk.PubLinks()) > 0 && songRe.MatchString(text) {
 				m := songRe.FindStringSubmatch(text)
 				n, _ := strconv.Atoi(m[1])
-				when := "inicio"
+				when := "start"
 				if len(wt.Songs) > 0 {
-					when = "final"
+					when = "end"
 				}
 				title := strings.TrimSpace(songRe.ReplaceAllString(text, ""))
 				wt.Songs = append(wt.Songs, Song{Number: n, Title: title, DocID: blk.PubLinks()[0].DocID, When: when, Video: fmt.Sprintf("pub-sjjm_%d_VIDEO", n)})

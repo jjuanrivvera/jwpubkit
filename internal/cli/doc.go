@@ -14,39 +14,39 @@ import (
 
 type docOut struct {
 	DocID     int                `json:"docid"`
-	Pub       string             `json:"publicacion"`
-	PubKey    string             `json:"clave"`
-	Title     string             `json:"titulo"`
-	Context   string             `json:"contexto,omitempty"`
+	Pub       string             `json:"publication"`
+	PubKey    string             `json:"key"`
+	Title     string             `json:"title"`
+	Context   string             `json:"context,omitempty"`
 	URL       string             `json:"url"`
-	Partial   string             `json:"parcial,omitempty"`
-	Blocks    []blockOut         `json:"parrafos"`
-	Images    []*content.Image   `json:"imagenes"`
+	Partial   string             `json:"partial,omitempty"`
+	Blocks    []blockOut         `json:"paragraphs"`
+	Images    []*content.Image   `json:"images"`
 	Videos    []content.VideoRef `json:"videos"`
-	BibleRefs []string           `json:"citas_biblicas"`
-	PubRefs   []refOut           `json:"referencias"`
+	BibleRefs []string           `json:"bible_citations"`
+	PubRefs   []refOut           `json:"references"`
 }
 
 type blockOut struct {
 	PID      int      `json:"pid"`
-	Kind     string   `json:"tipo"`
-	Level    int      `json:"nivel,omitempty"`
-	Num      int      `json:"numero,omitempty"`
-	NumLabel string   `json:"numero_etiqueta,omitempty"`
-	Sub      int      `json:"subentrada,omitempty"`
-	Text     string   `json:"texto"`
-	Question bool     `json:"pregunta,omitempty"`
-	Box      bool     `json:"recuadro,omitempty"`
-	RelPID   int      `json:"pregunta_pid,omitempty"`
-	Bible    []string `json:"citas,omitempty"`
-	Refs     []refOut `json:"referencias,omitempty"`
+	Kind     string   `json:"kind"`
+	Level    int      `json:"level,omitempty"`
+	Num      int      `json:"number,omitempty"`
+	NumLabel string   `json:"number_label,omitempty"`
+	Sub      int      `json:"subentry,omitempty"`
+	Text     string   `json:"text"`
+	Question bool     `json:"question,omitempty"`
+	Box      bool     `json:"box,omitempty"`
+	RelPID   int      `json:"question_pid,omitempty"`
+	Bible    []string `json:"citations,omitempty"`
+	Refs     []refOut `json:"references,omitempty"`
 	Videos   []string `json:"videos,omitempty"`
 }
 
 type refOut struct {
-	Text  string `json:"texto"`
+	Text  string `json:"text"`
 	DocID int    `json:"docid"`
-	Pars  string `json:"parrafos,omitempty"`
+	Pars  string `json:"paragraphs,omitempty"`
 	PID   int    `json:"pid"`
 	URL   string `json:"url"`
 }
@@ -55,22 +55,22 @@ func (a *app) docCmd() *cobra.Command {
 	var format string
 	cmd := &cobra.Command{
 		Use:   "doc <docid>",
-		Short: "Un documento completo en Markdown limpio, JSON o texto",
-		Long: `Muestra un documento de la biblioteca por su docid (el mismo número de wol:
-wol.jw.org/es/wol/d/r4/lp-s/<docid>) con párrafos numerados como los citan las
-publicaciones, preguntas de estudio, citas bíblicas, referencias a otras publicaciones
-(con su docid) e imágenes (sus archivos se bajan con "pubkit imagen <docid>").
+		Short: "A whole document as clean Markdown, JSON or plain text",
+		Long: `Prints a document from the library by its docid — the same number wol uses — with
+its paragraphs numbered the way publications cite them, study questions, Bible
+citations, references to other publications (with their docid) and images (the files
+themselves come down with "pubkit image <docid>").
 
-Si el documento no está sincronizado pero otra publicación trae un extracto de él
-(la Guía trae el capítulo del libro de estudio, por ejemplo), muestra ese extracto.`,
+When the document is not synced but another publication carries an extract of it, the
+extract is printed instead.`,
 		Example: `  pubkit doc 2026485
-  pubkit doc 1200001265 --formato txt
-  pubkit doc 202026255 --formato json | jq '.parrafos[] | select(.pregunta)'`,
+  pubkit doc 1200001265 --format txt
+  pubkit doc 202026255 --format json | jq '.paragraphs[] | select(.question)'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			docid, err := strconv.Atoi(args[0])
 			if err != nil {
-				return fmt.Errorf("docid inválido %q", args[0])
+				return fmt.Errorf("invalid docid %q", args[0])
 			}
 			st, err := a.store()
 			if err != nil {
@@ -86,26 +86,26 @@ Si el documento no está sincronizado pero otra publicación trae un extracto de
 			switch format {
 			case "json":
 				return a.printJSON(out)
-			case "txt", "texto":
+			case "txt", "text":
 				a.printf("%s\n%s · docid %d · %s\n", out.Title, out.Pub, out.DocID, out.URL)
 				if out.Partial != "" {
-					a.printf("[PARCIAL] %s\n", out.Partial)
+					a.printf("[PARTIAL] %s\n", out.Partial)
 				}
 				a.printf("\n%s", parsed.PlainText())
 			case "md", "markdown":
-				a.printf("---\ndocid: %d\npublicacion: %s\ntitulo: %q\nurl: %s\n", out.DocID, out.Pub, out.Title, out.URL)
+				a.printf("---\ndocid: %d\npublication: %s\ntitle: %q\nurl: %s\n", out.DocID, out.Pub, out.Title, out.URL)
 				if out.Partial != "" {
-					a.printf("parcial: %q\n", out.Partial)
+					a.printf("partial: %q\n", out.Partial)
 				}
 				a.printf("---\n\n%s", parsed.Markdown(content.RenderOptions{DocID: docid}))
 				a.printReferences(out)
 			default:
-				return fmt.Errorf("formato %q desconocido (md, json o txt)", format)
+				return fmt.Errorf("unknown format %q (md, json or txt)", format)
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&format, "formato", "f", "md", "md, json o txt")
+	cmd.Flags().StringVarP(&format, "format", "f", "md", "md, json or txt")
 	return cmd
 }
 
@@ -120,7 +120,7 @@ func (a *app) loadDoc(st *store.Store, docid int) (*docOut, *content.Doc, error)
 		htmlText = d.HTML
 		out.Pub, out.PubKey, out.Title, out.Context = d.Pub.MepsSymbol, d.Pub.Key, d.Title, d.ContextTitle
 		if htmlText == "" {
-			return nil, nil, fmt.Errorf("el documento %d (%s) no tiene contenido propio (en una Biblia el texto está en los versículos: usa pubkit versiculo)", docid, d.Title)
+			return nil, nil, fmt.Errorf("document %d (%s) has no content of its own (in a Bible the text lives in the verses: use pubkit verse)", docid, d.Title)
 		}
 	case errors.Is(err, store.ErrNoDoc):
 		exts, xerr := st.ExtractsFor(docid)
@@ -128,14 +128,14 @@ func (a *app) loadDoc(st *store.Store, docid int) (*docOut, *content.Doc, error)
 			return nil, nil, xerr
 		}
 		if len(exts) == 0 {
-			return nil, nil, fmt.Errorf("el documento %d no está en la biblioteca ni hay extractos de él; sincroniza su publicación (pubkit pubs para ver lo que hay)", docid)
+			return nil, nil, fmt.Errorf("document %d is not in the library and nothing extracts it; sync its publication (pubkit pubs shows what you have)", docid)
 		}
 		e := exts[0]
 		htmlText = e.HTML
 		out.Pub, out.Title = e.RefSymbol, e.Title
-		out.Partial = fmt.Sprintf("extracto de %s que trae %s (párrafos %d-%d); el documento completo: %s", e.Caption, e.PubFile[strings.LastIndex(e.PubFile, "/")+1:], e.RefBegin, e.RefEnd, syncCommand(e))
+		out.Partial = fmt.Sprintf("extract of %s carried by %s (paragraphs %d-%d); the whole document: %s", e.Caption, e.PubFile[strings.LastIndex(e.PubFile, "/")+1:], e.RefBegin, e.RefEnd, syncCommand(e))
 		if e.RefBegin == 0 {
-			out.Partial = fmt.Sprintf("extracto de %s que trae %s; el documento completo: %s", e.Caption, e.PubFile[strings.LastIndex(e.PubFile, "/")+1:], syncCommand(e))
+			out.Partial = fmt.Sprintf("extract of %s carried by %s; the whole document: %s", e.Caption, e.PubFile[strings.LastIndex(e.PubFile, "/")+1:], syncCommand(e))
 		}
 	default:
 		return nil, nil, err
@@ -199,7 +199,7 @@ func (a *app) loadDoc(st *store.Store, docid int) (*docOut, *content.Doc, error)
 func syncCommand(e store.Extract) string {
 	sym := e.RefUndated
 	if sym == "" {
-		return "pubkit sync <símbolo>"
+		return "pubkit sync <symbol>"
 	}
 	if e.RefIssue != 0 {
 		return fmt.Sprintf("pubkit sync %s --issue %s", sym, store.NormalizeIssue(strconv.Itoa(e.RefIssue)))
@@ -211,18 +211,18 @@ func (a *app) printReferences(out *docOut) {
 	if len(out.BibleRefs) == 0 && len(out.PubRefs) == 0 && len(out.Videos) == 0 {
 		return
 	}
-	a.printf("\n---\n\n## Referencias\n\n")
+	a.printf("\n---\n\n## References\n\n")
 	if len(out.BibleRefs) > 0 {
-		a.printf("**Citas bíblicas:** %s\n\n", strings.Join(out.BibleRefs, "; "))
+		a.printf("**Bible citations:** %s\n\n", strings.Join(out.BibleRefs, "; "))
 	}
 	if len(out.PubRefs) > 0 {
-		a.printf("**Publicaciones:**\n\n")
+		a.printf("**Publications:**\n\n")
 		for _, r := range out.PubRefs {
 			a.printf("- %s → docid %d", r.Text, r.DocID)
 			if r.Pars != "" {
 				a.printf(" ¶%s", r.Pars)
 			}
-			a.printf(" (en pid %d)\n", r.PID)
+			a.printf(" (at pid %d)\n", r.PID)
 		}
 		a.printf("\n")
 	}
