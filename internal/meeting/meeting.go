@@ -70,7 +70,12 @@ type Song struct {
 // Section groups the parts under one of the workbook's top-level headings.
 type Section struct {
 	Title string `json:"title"`
-	Parts []Part `json:"parts"`
+	// Marker is the untranslated icon the publication puts on this section's
+	// heading, which is how a section is recognized in any language. Empty when
+	// the markup carries no marker, and then the parts are still listed but
+	// nothing is derived from which section they are in.
+	Marker string `json:"marker,omitempty"`
+	Parts  []Part `json:"parts"`
 }
 
 // Part of the meeting.
@@ -213,11 +218,11 @@ func WatchtowerIssues(monday time.Time) []string {
 }
 
 var (
-	// Publications put no-break spaces in "Canción\u00a0128" and "(4\u00a0mins.)";
+	// Publications put no-break spaces between a number and its unit;
 	// \s alone does not match them.
-	minutesRe = regexp.MustCompile(`\((\d+)[\s\x{a0}]*mins?\.\)`)
-	songRe    = regexp.MustCompile(`(?i)canci[oó]n[\s\x{a0}]+(\d+)`)
-	partNumRe = regexp.MustCompile(`^(\d+)\.[\s\x{a0}]*(.+)$`)
+	// The digits a part uses to announce its length, inside whichever brackets the
+	// script writes: ASCII, fullwidth CJK, or the lenticular brackets some use.
+	parenRe = regexp.MustCompile(`[(\x{ff08}\x{3010}]([^)\x{ff09}\x{3011}]*)[)\x{ff09}\x{3011}]`)
 )
 
 // Builder assembles a week from the library.
@@ -267,16 +272,6 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 	var section *Section
 	var part *Part
 	songsSeen := 0
-	whenOf := func(i int) string {
-		switch i {
-		case 0:
-			return "start"
-		case 1:
-			return "middle"
-		default:
-			return "end"
-		}
-	}
 	flush := func() {
 		if part != nil && section != nil {
 			section.Parts = append(section.Parts, *part)
@@ -304,30 +299,30 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 			continue
 		case blk.Kind == content.KindHeading && blk.Level == 2:
 			flush()
-			w.Sections = append(w.Sections, Section{Title: text})
+			w.Sections = append(w.Sections, Section{Title: text, Marker: blk.Marker})
 			section = &w.Sections[len(w.Sections)-1]
 			continue
 		case blk.Kind == content.KindHeading && blk.Level == 3:
 			flush()
 			ensureSection()
-			for _, m := range songRe.FindAllStringSubmatch(text, -1) {
-				n, _ := strconv.Atoi(m[1])
-				s := Song{Number: n, When: whenOf(songsSeen), Video: fmt.Sprintf("pub-sjjm_%d_VIDEO", n)}
-				s.DocID, s.Title = songDoc(n, blk.PubLinks(), extracts)
+			for _, s := range b.songsIn(blk, extracts, songsSeen) {
 				w.Songs = append(w.Songs, s)
 				songsSeen++
 			}
-			title := partTitle(text)
+			songTexts := make([]string, 0, 2)
+			for _, l := range blk.PubLinks() {
+				songTexts = append(songTexts, l.Text)
+			}
+			title := partTitle(text, songTexts)
 			if title == "" {
-				continue // a heading that only announces a song ("Canción 90")
+				continue // a heading that only announces a song
 			}
 			part = &Part{Title: title, PID: blk.PID}
-			if m := partNumRe.FindStringSubmatch(title); m != nil {
-				part.Number, _ = strconv.Atoi(m[1])
-				part.Title = m[2]
+			if n, rest, ok := leadingNumber(title); ok {
+				part.Number, part.Title = n, rest
 			}
-			if m := minutesRe.FindStringSubmatch(text); m != nil {
-				part.Minutes, _ = strconv.Atoi(m[1])
+			if n, ok := minutesIn(text); ok {
+				part.Minutes = n
 			}
 			continue
 		}
@@ -335,11 +330,11 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 			continue
 		}
 		if part.Minutes == 0 {
-			if m := minutesRe.FindStringSubmatch(text); m != nil {
-				part.Minutes, _ = strconv.Atoi(m[1])
+			if n, ok := minutesIn(text); ok {
+				part.Minutes = n
 			}
 		}
-		clean := strings.TrimSpace(minutesRe.ReplaceAllString(text, ""))
+		clean := strings.TrimSpace(stripMinutes(text))
 		if blk.IsQuestion() {
 			part.Questions = append(part.Questions, clean)
 		} else if clean != "" && blk.Kind != content.KindCaption && blk.Kind != content.KindCredit {
@@ -398,64 +393,204 @@ func (b *Builder) BuildWorkbook(w *Week, docid int, dated store.DatedDoc) error 
 		w.Images = append(w.Images, img)
 	}
 
-	for si := range w.Sections {
-		for pi := range w.Sections[si].Parts {
-			p := &w.Sections[si].Parts[pi]
-			low := strings.ToLower(p.Title)
-			switch {
-			case strings.Contains(low, "lectura de la biblia"):
-				w.StudentReading = studentReading(p)
-			case strings.Contains(low, "estudio bíblico de la congregación"):
-				for _, r := range p.References {
-					if r.Kind != "publication" {
-						continue
-					}
-					for _, e := range extracts {
-						if e.RefDocID == r.DocID {
-							sc, err := studyChapter(e)
-							if err == nil {
-								p.Study = sc
-								w.CongregationStudy = sc
-								for _, v := range sc.Videos {
-									v.Part = p.label()
-									w.Videos = append(w.Videos, v)
-								}
-								for _, im := range sc.Images {
-									im.Part = p.label()
-									w.Images = append(w.Images, im)
-								}
-							}
-							break
-						}
-					}
-					break
-				}
-			}
-		}
-	}
+	b.identifyParts(w, extracts)
 	return nil
 }
 
-// songDoc finds the docid and title of song n from the heading links or,
-// failing that, from the extracts ("sjj canción 128").
-func songDoc(n int, links []*content.Link, extracts []store.Extract) (int, string) {
-	num := strconv.Itoa(n)
-	for _, l := range links {
-		if m := songRe.FindStringSubmatch(l.Text); m != nil && m[1] == num {
-			for _, e := range extracts {
-				if e.RefDocID == l.DocID {
-					return l.DocID, e.Title
+// Section markers, as publications name them in a class on the wrapper of each
+// section heading. They are icons, not words, so they are the same in every
+// language; the heading text beside them is not.
+const (
+	markerTreasures = "gem"       // the section that opens the meeting
+	markerMinistry  = "wheat"     // the field-ministry section
+	markerLiving    = "sheep"     // the closing section
+	markerLegacyT   = "treasures" // the pre-2025 markup names them in words
+	markerLegacyM   = "ministry"
+	markerLegacyL   = "christianLiving"
+)
+
+func sectionRole(marker string) string {
+	switch marker {
+	case markerTreasures, markerLegacyT:
+		return markerTreasures
+	case markerMinistry, markerLegacyM:
+		return markerMinistry
+	case markerLiving, markerLegacyL:
+		return markerLiving
+	}
+	return ""
+}
+
+// identifyParts works out which part is the student Bible reading and which is
+// the congregation study WITHOUT reading their titles, because the titles are
+// translated and the structure is not:
+//
+//   - the student reading is the last part of the opening section that carries a
+//     Bible reference of its own;
+//   - the congregation study is the last part of the closing section whose
+//     publication extract is a book chapter rather than a song, identified by
+//     the extract parsing successfully rather than by what the part is called.
+//
+// When a signal is missing the field is left empty and the reason is recorded,
+// which is the honest outcome for the weeks that genuinely have no such part
+// (an assembly, a circuit overseer's visit).
+func (b *Builder) identifyParts(w *Week, extracts []store.Extract) {
+	marked := false
+	for _, sec := range w.Sections {
+		if sectionRole(sec.Marker) != "" {
+			marked = true
+		}
+	}
+	if !marked {
+		// Not a language problem: this markup does not mark its sections at all,
+		// so nothing can be derived from which section a part sits in. The parts
+		// and their text are still there.
+		w.Notes = append(w.Notes, "this workbook's markup carries no section markers, so the student reading and the congregation study could not be identified")
+		return
+	}
+	for si := range w.Sections {
+		role := sectionRole(w.Sections[si].Marker)
+		parts := w.Sections[si].Parts
+		for pi := len(parts) - 1; pi >= 0; pi-- {
+			p := &w.Sections[si].Parts[pi]
+			switch role {
+			case markerTreasures:
+				if w.StudentReading == nil {
+					if a := studentReading(p); a.Range != nil {
+						w.StudentReading = a
+					}
+				}
+			case markerLiving:
+				if w.CongregationStudy == nil {
+					b.attachStudy(w, p, extracts)
 				}
 			}
-			return l.DocID, ""
 		}
+	}
+	if w.StudentReading == nil {
+		w.Notes = append(w.Notes, "no part of the opening section carries a Bible reference of its own, so there is no student reading to report")
+	}
+	if w.CongregationStudy == nil {
+		w.Notes = append(w.Notes, "no part of the closing section extracts a book chapter, so there is no congregation study to report")
+	}
+}
+
+// attachStudy tries to read a part's publication reference as a study chapter.
+// The successful parse IS the identification: a part that yields a chapter with
+// its questions is the congregation study, whatever it is called.
+func (b *Builder) attachStudy(w *Week, p *Part, extracts []store.Extract) {
+	for _, r := range p.References {
+		if r.Kind != "publication" || r.DocID == 0 {
+			continue
+		}
+		for _, e := range extracts {
+			if e.RefDocID != r.DocID || e.RefClass == songClass {
+				continue
+			}
+			sc, err := studyChapter(e)
+			if err != nil || sc == nil {
+				continue
+			}
+			p.Study = sc
+			w.CongregationStudy = sc
+			for _, v := range sc.Videos {
+				v.Part = p.label()
+				w.Videos = append(w.Videos, v)
+			}
+			for _, im := range sc.Images {
+				im.Part = p.label()
+				w.Images = append(w.Images, im)
+			}
+			return
+		}
+	}
+}
+
+// songClass is the document class a publication gives a songbook entry in its
+// extract table. Measured identical across languages; the symbol beside it
+// ("sjj") is NOT — it is translated — so the class is what can be matched on.
+const songClass = 31
+
+// whenOf names a song by its position in the meeting, which is the only
+// language-neutral thing about it.
+func whenOf(i int) string {
+	switch i {
+	case 0:
+		return "start"
+	case 1:
+		return "middle"
+	default:
+		return "end"
+	}
+}
+
+// songsIn finds the songs a heading announces without reading the heading. A
+// song is a publication extract of class 31 anchored at this heading; its number
+// is the chapter number of the songbook document it points at, which is a number
+// in every language. Only if the songbook is not in the library does it fall
+// back to reading digits out of the caption.
+func (b *Builder) songsIn(blk *content.Block, extracts []store.Extract, seen int) []Song {
+	var out []Song
+	add := func(docid int, title, caption string) {
+		s := Song{DocID: docid, Title: title, When: whenOf(seen + len(out))}
+		if n, ok := b.chapterNumber(docid); ok {
+			s.Number = n
+		} else if n, ok := firstNumber(caption); ok {
+			s.Number = n
+		}
+		if s.Number > 0 {
+			s.Video = fmt.Sprintf("pub-sjjm_%d_VIDEO", s.Number)
+		}
+		out = append(out, s)
 	}
 	for _, e := range extracts {
-		if m := songRe.FindStringSubmatch(e.Caption); m != nil && m[1] == num && strings.HasPrefix(e.Caption, "sjj") {
-			return e.RefDocID, e.Title
+		if e.RefClass == songClass && e.BeginPID == blk.PID {
+			add(e.RefDocID, e.Title, e.Caption)
 		}
 	}
-	return 0, ""
+	if len(out) > 0 {
+		return out
+	}
+	// A heading can link the song without the workbook shipping an extract of it.
+	for _, l := range blk.PubLinks() {
+		if l.DocID == 0 {
+			continue
+		}
+		if n, ok := b.chapterNumber(l.DocID); ok && isSongDoc(b, l.DocID) {
+			out = append(out, Song{DocID: l.DocID, Number: n, When: whenOf(seen + len(out)),
+				Video: fmt.Sprintf("pub-sjjm_%d_VIDEO", n)})
+		}
+	}
+	return out
+}
+
+func (b *Builder) chapterNumber(docid int) (int, bool) {
+	if b.Store == nil || docid == 0 {
+		return 0, false
+	}
+	n, ok := b.Store.ChapterNumber(docid)
+	return n, ok && n > 0
+}
+
+// isSongDoc asks the library whether a document belongs to the songbook, by the
+// class the publication itself records — never by its symbol, which is translated.
+func isSongDoc(b *Builder, docid int) bool {
+	if b.Store == nil {
+		return false
+	}
+	d, err := b.Store.Doc(docid)
+	return err == nil && d.Class == songClass
+}
+
+// minutesIn reads the length a part announces. The digits can be of any script;
+// what marks them is the parentheses the publication puts them in, which every
+// language keeps.
+func minutesIn(text string) (int, bool) {
+	m := parenRe.FindStringSubmatch(text)
+	if m == nil {
+		return 0, false
+	}
+	return firstNumber(m[1])
 }
 
 func (p *Part) label() string {
@@ -477,18 +612,52 @@ func (w *Week) partAt(pid int) *Part {
 	return nil
 }
 
-// partTitle drops the song announcement from a heading:
-// "Canción 102 y oración | Título de la parte (1 min.)" → "Título de la parte".
-func partTitle(h string) string {
+// partTitle is what is left of a heading once the song announcement and the
+// length are taken out of it. A heading can announce a song and a part at once,
+// separated by a bar; the song is recognized by the text of its own link, not by
+// the word for "song", which is translated.
+func partTitle(h string, songTexts []string) string {
 	var keep []string
 	for _, piece := range strings.Split(h, "|") {
-		piece = strings.TrimSpace(minutesRe.ReplaceAllString(piece, ""))
-		if piece == "" || songRe.MatchString(piece) {
+		piece = strings.TrimSpace(stripMinutes(piece))
+		if piece == "" || isSongPiece(piece, songTexts) {
 			continue
 		}
 		keep = append(keep, piece)
 	}
 	return strings.Join(keep, " | ")
+}
+
+// isSongPiece reports whether a piece of a heading is the song announcement,
+// which it is when the song's own link text is most of what the piece says.
+func isSongPiece(piece string, songTexts []string) bool {
+	for _, t := range songTexts {
+		t = strings.TrimSpace(t)
+		if t == "" || !strings.Contains(piece, t) {
+			continue
+		}
+		// The rest is a connecting word or two ("and prayer"), not a part.
+		if len([]rune(piece))-len([]rune(t)) <= 24 {
+			return true
+		}
+	}
+	return false
+}
+
+// stripMinutes removes the parenthetical a part uses to announce its length,
+// and only that one: a parenthetical holding a number and little else. Removing
+// every parenthetical would delete text the publication meant to show.
+func stripMinutes(text string) string {
+	for _, m := range parenRe.FindAllStringSubmatch(text, -1) {
+		if _, ok := firstNumber(m[1]); !ok {
+			continue
+		}
+		if len([]rune(m[1])) > 16 {
+			continue
+		}
+		text = strings.Replace(text, m[0], "", 1)
+	}
+	return text
 }
 
 func weeklyReading(text string, refs []bible.Range) *Reading {
@@ -506,24 +675,6 @@ func weeklyReading(text string, refs []bible.Range) *Reading {
 		r.Ref = bible.FormatList(refs)
 	}
 	return r
-}
-
-// ParsedLanguages are the languages whose workbook markup this package knows how
-// to take apart. The structure of a week — which part is the Bible reading, which
-// is the congregation study — is announced in the publication's own words, and
-// those words are matched below, so a language that is not listed here yields the
-// parts and their text but leaves the derived fields empty. Adding a language is
-// a matter of teaching those matches, not of rewriting the parser.
-var ParsedLanguages = []string{"S"}
-
-// Parses reports whether the meeting parser knows this language's markup.
-func Parses(lang string) bool {
-	for _, l := range ParsedLanguages {
-		if l == lang {
-			return true
-		}
-	}
-	return false
 }
 
 func studentReading(p *Part) *Assignment {
@@ -595,7 +746,7 @@ func studyChapter(e store.Extract) (*StudyChapter, error) {
 	sc := &StudyChapter{DocID: e.RefDocID, Pub: e.RefSymbol, Location: e.Caption, Title: e.Title}
 	var group *QuestionGroup
 	inAccounts := false
-	for _, it := range d.Items {
+	for i, it := range d.Items {
 		if img := it.Image; img != nil {
 			if img.Height > 0 && img.Height < 200 {
 				continue // decorative strip
@@ -611,7 +762,10 @@ func studyChapter(e store.Extract) (*StudyChapter, error) {
 		case blk.Kind == content.KindHeading && blk.Level == 1:
 			sc.Title = text
 		case blk.Kind == content.KindHeading:
-			inAccounts = strings.Contains(strings.ToLower(text), "relato bíblico")
+			// The accounts to read are the group that is nothing but Bible
+			// references: no question, no answer field. That shape is the same
+			// in every language, unlike the heading that announces it.
+			inAccounts = onlyBibleRefs(d.Items, i)
 			sc.Groups = append(sc.Groups, QuestionGroup{Title: text})
 			group = &sc.Groups[len(sc.Groups)-1]
 		case blk.Kind == content.KindPara && !blk.IsQuestion() && group == nil:
@@ -694,16 +848,19 @@ func (b *Builder) BuildWatchtower(w *Week, docid int) error {
 		case content.KindContext:
 			wt.Date = text
 		case content.KindMeta:
-			if len(blk.PubLinks()) > 0 && songRe.MatchString(text) {
-				m := songRe.FindStringSubmatch(text)
-				n, _ := strconv.Atoi(m[1])
-				when := "start"
-				if len(wt.Songs) > 0 {
-					when = "end"
+			// A song announcement is a link into the songbook. Its number comes
+			// from the linked document, or from the digits beside it in whatever
+			// script the publication uses — never from the word "song".
+			if links := blk.PubLinks(); len(links) > 0 {
+				if n, ok := b.songNumber(links[0].DocID, text); ok {
+					when := "start"
+					if len(wt.Songs) > 0 {
+						when = "end"
+					}
+					wt.Songs = append(wt.Songs, Song{Number: n, Title: songTitle(text, links[0].Text),
+						DocID: links[0].DocID, When: when, Video: fmt.Sprintf("pub-sjjm_%d_VIDEO", n)})
+					continue
 				}
-				title := strings.TrimSpace(songRe.ReplaceAllString(text, ""))
-				wt.Songs = append(wt.Songs, Song{Number: n, Title: title, DocID: blk.PubLinks()[0].DocID, When: when, Video: fmt.Sprintf("pub-sjjm_%d_VIDEO", n)})
-				continue
 			}
 			if isLabel(text) {
 				expectSummary = true
@@ -885,4 +1042,51 @@ func (w *Week) Normalize() {
 	if wt := w.Watchtower; wt != nil && wt.Questions == nil {
 		wt.Questions = []StudyQuestion{}
 	}
+}
+
+// onlyBibleRefs reports whether the blocks under the heading at index i carry
+// Bible references and nothing that asks the reader anything. That is the shape
+// of the "read these accounts" group, in any language.
+func onlyBibleRefs(items []content.Item, i int) bool {
+	refs := false
+	for _, it := range items[i+1:] {
+		blk := it.Block
+		if blk == nil {
+			continue
+		}
+		if blk.Kind == content.KindHeading {
+			break
+		}
+		if blk.IsQuestion() || blk.Answer {
+			return false
+		}
+		if len(blk.BibleRefs()) > 0 {
+			refs = true
+		}
+	}
+	return refs
+}
+
+// songNumber resolves the number of the song a link points at: from the songbook
+// document when the library holds it, otherwise from the digits printed beside
+// the link. It reports false when the link is not a song at all.
+func (b *Builder) songNumber(docid int, text string) (int, bool) {
+	if docid == 0 {
+		return 0, false
+	}
+	if n, ok := b.chapterNumber(docid); ok && isSongDoc(b, docid) {
+		return n, true
+	}
+	if b.Store != nil {
+		if d, err := b.Store.Doc(docid); err == nil && d.Class != songClass {
+			return 0, false
+		}
+	}
+	return firstNumber(text)
+}
+
+// songTitle is whatever the announcement says once the link itself is taken out
+// of it, which is the part the publication wrote about this particular song.
+func songTitle(text, linkText string) string {
+	return strings.TrimSpace(strings.Replace(text, linkText, "", 1))
 }

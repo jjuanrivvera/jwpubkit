@@ -46,12 +46,16 @@ type Pub struct {
 
 // Extract is a DocumentExtract + Extract row.
 type Extract struct {
-	DocID      int
-	ExtractID  int
-	Link       string
-	Caption    string
-	HTML       string
-	RefDocID   int
+	DocID     int
+	ExtractID int
+	Link      string
+	Caption   string
+	HTML      string
+	RefDocID  int
+	// RefClass is the class the publication gives the referenced document: 31 a
+	// song, 13 a book chapter, 40 a magazine article. It is not translated,
+	// unlike RefSymbol, so it is what the parser can key on. Zero means 40.
+	RefClass   int
 	RefSymbol  string
 	RefUndated string
 	RefIssue   int
@@ -133,7 +137,11 @@ func Build(t testing.TB, dir string, p Pub) string {
 	}
 	for i, e := range p.Extracts {
 		mustExec(`INSERT INTO RefPublication VALUES(?,?,?,?,?)`, i+1, e.RefSymbol, e.RefUndated, e.RefIssue, e.RefSymbol)
-		mustExec(`INSERT INTO Extract VALUES(?,?,?,?,?,?,40,0,0)`, e.ExtractID, e.Link, e.Caption, enc(e.HTML), i+1, e.RefDocID)
+		class := e.RefClass
+		if class == 0 {
+			class = 40
+		}
+		mustExec(`INSERT INTO Extract VALUES(?,?,?,?,?,?,?,0,0)`, e.ExtractID, e.Link, e.Caption, enc(e.HTML), i+1, e.RefDocID, class)
 		mustExec(`INSERT INTO DocumentExtract(DocumentId, ExtractId, BeginParagraphOrdinal, EndParagraphOrdinal, SortPosition) VALUES(?,?,?,?,?)`,
 			e.DocID, e.ExtractID, e.BeginPID, e.BeginPID, e.Sort)
 	}

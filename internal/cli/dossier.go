@@ -200,9 +200,9 @@ citations are never dropped.`,
 	return cmd
 }
 
-// chapterRanges expands a chapter reference ("Gén 37-41", "Jer 38-39") into
+// chapterRanges expands a chapter reference ("Gen 37-41", "Jer 38-39") into
 // one whole-chapter bible.Range per chapter, in order, without repeats. It
-// reuses bible.Parse per chapter (via "<libro> <capítulo>") instead of
+// reuses bible.Parse per chapter (via "<book> <chapter>") instead of
 // reimplementing chapter-boundary rules (Psalm superscriptions, etc.).
 func chapterRanges(ref string) ([]bible.Range, error) {
 	ranges, err := bible.Parse(ref)
@@ -411,7 +411,8 @@ func (a *app) chapterImages(st *store.Store, cites []citationOut) ([]imageOut, [
 }
 
 // properNounRe finds capitalized-word candidates (with an optional
-// hyphenated suffix, e.g. "Ébed-Mélec") in running Spanish text.
+// hyphenated suffix) in running text. It only works for cased scripts, which is
+// why it is documented as a Spanish-only heuristic in DECISIONS.md.
 var properNounRe = regexp.MustCompile(`[A-ZÁÉÍÓÚÑ][\p{Ll}áéíóúñ]{2,}(?:-[A-ZÁÉÍÓÚÑ]?[\p{Ll}áéíóúñ]+)?`)
 
 // placeStopwords are common capitalized words (sentence starts, deity

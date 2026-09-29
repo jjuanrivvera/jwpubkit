@@ -107,7 +107,7 @@ func (s *Store) Index(info PubInfo) (*IndexStats, error) {
 	}
 	for _, step := range steps {
 		if err := step.fn(); err != nil {
-			return nil, fmt.Errorf("indexando %s de %s: %w", step.name, info.Key(), err)
+			return nil, fmt.Errorf("indexing %s of %s: %w", step.name, info.Key(), err)
 		}
 	}
 	if err := tx.Commit(); err != nil {

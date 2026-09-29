@@ -124,11 +124,6 @@ func (a *app) buildWeek(day time.Time, withWT bool) (*meeting.Week, error) {
 			w.Notes = append(w.Notes, "No study Watchtower found for this week (tried: w "+strings.Join(meeting.WatchtowerIssues(monday), ", ")+").")
 		}
 	}
-	if !meeting.Parses(a.lang) {
-		w.Notes = append(w.Notes, "The meeting parser currently recognizes the workbook markup of these languages: "+
-			strings.Join(meeting.ParsedLanguages, ", ")+". In "+a.lang+" the parts and their text are still listed, but the "+
-			"derived fields (weekly reading, student reading, songs, congregation study) may come back empty.")
-	}
 	a.resolveVideos(w)
 	return w, nil
 }

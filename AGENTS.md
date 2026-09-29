@@ -32,10 +32,10 @@ Two layers know about languages, and they are not the same:
 - **Book names.** English and Spanish ship built in. Every other language is *learned*: when a
   Bible is indexed, `BibleBook.ChapterDisplayTitle` is stored in `book_name` and handed to the
   `bible` package on open. References parse in any known language and print in the chosen one.
-- **Workbook markup.** `internal/meeting` finds the parts of a week by matching the headings the
-  publication uses, so it only works for the languages in `meeting.ParsedLanguages` (today: `S`).
-  Any other language still gets the parts and their text; the derived fields come back empty and
-  `week` says so in its notes. Adding a language means teaching those matches.
+- **Workbook markup.** `internal/meeting` reads a week by its structure, never by its words: the
+  untranslated icon classes on section headings, the document class of an extract, and Unicode
+  digits in any script. See DECISIONS.md for the signal table. If you are ever tempted to add a
+  `strings.Contains` against a translated phrase, that is the thing this was built to remove.
 
 The Spanish command and flag names the CLI shipped with are kept as aliases
 (`internal/cli/root.go`), so scripts written against an older version keep working.

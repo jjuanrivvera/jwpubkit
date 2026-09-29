@@ -78,12 +78,18 @@ type Run struct {
 
 // Block is one element carrying a data-pid.
 type Block struct {
-	PID      int
-	Kind     string
-	Level    int    // heading level (1-4)
-	Num      int    // paragraph number as publications cite it, or question number
-	Sub      int    // numbered subentry of an encyclopedia article
-	Class    string // first class of the element: "sb", "sn", "qu"...
+	PID     int
+	Kind    string
+	Level   int      // heading level (1-4)
+	Num     int      // paragraph number as publications cite it, or question number
+	Sub     int      // numbered subentry of an encyclopedia article
+	Class   string   // first class of the element: "sb", "sn", "qu"...
+	Classes []string // every class of the element
+	// Marker is the untranslated icon name a publication puts on the wrapper of
+	// a section heading ("gem", "wheat", "sheep", "music"). It is the same in
+	// every language, which is what lets a section be recognized without reading
+	// the words in it.
+	Marker   string
 	NumLabel string // "3, 4" for questions that cover two paragraphs
 	FnLabel  string // footnote letter
 	RelPID   int    // question this paragraph answers (data-rel-pid)
@@ -126,6 +132,7 @@ func Parse(src string) (*Doc, error) {
 }
 
 type style struct {
+	marker       string
 	bold, italic bool
 	link         *Link
 	inBox        bool
@@ -146,6 +153,27 @@ func attr(n *html.Node, key string) string {
 	for _, a := range n.Attr {
 		if a.Key == key {
 			return a.Val
+		}
+	}
+	return ""
+}
+
+// iconMarker reads the untranslated icon a publication attaches to a section
+// heading. Two markup generations are in the wild and both name the icon in a
+// class rather than in words:
+//
+//	2025+ : class="… dc-icon--gem dc-icon-layout--top …"
+//	rev2021: class="mwbHeadingIcon and treasures--rev2021"
+//
+// Everything else about those headings — the words, the script, the reading
+// direction — changes with the language. This does not.
+func iconMarker(n *html.Node) string {
+	for _, c := range strings.Fields(attr(n, "class")) {
+		if rest, ok := strings.CutPrefix(c, "dc-icon--"); ok && rest != "" {
+			return rest
+		}
+		if rest, ok := strings.CutSuffix(c, "--rev2021"); ok && rest != "" {
+			return rest
 		}
 	}
 	return ""
@@ -263,6 +291,9 @@ func (p *parser) walk(n *html.Node, st style) {
 	if hasClass(n, "boxSupplement") || hasClass(n, "blockTeach") || hasClass(n, "boxContent") {
 		st.inBox = true
 	}
+	if m := iconMarker(n); m != "" {
+		st.marker = m
+	}
 	if hasClass(n, "fn-ref") || hasClass(n, "groupFootnote") {
 		st.inFootnote = true
 	}
@@ -281,9 +312,13 @@ func (p *parser) walk(n *html.Node, st style) {
 	}
 
 	pid, _ := strconv.Atoi(pidStr)
-	b := &Block{PID: pid, Kind: blockKind(n, st), InBox: st.inBox}
+	b := &Block{PID: pid, Kind: blockKind(n, st), InBox: st.inBox, Marker: st.marker}
 	if cls := strings.Fields(attr(n, "class")); len(cls) > 0 {
 		b.Class = cls[0]
+		b.Classes = cls
+	}
+	if m := iconMarker(n); m != "" {
+		b.Marker = m
 	}
 	if b.Kind == KindHeading {
 		b.Level = headingLevel(n)

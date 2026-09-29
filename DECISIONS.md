@@ -52,12 +52,36 @@ pre-language `jwlib.db` keeps serving the language it already holds, and any oth
 opens `jwlib.<lang>.db`. A library created from now on always uses the per-language name, so
 nothing downstream has to guess what a file contains.
 
-## The meeting parser is language-bound, and says so
+## The meeting is read by its structure, never by its words
 
-`internal/meeting` finds the parts of a week by matching the words the workbook uses, so it
-works for the languages in `ParsedLanguages` (today `S`). Rather than fail quietly in a
-language it does not know, `week` lists the parts it can and adds a note saying which fields
-came back empty and why. Teaching it a language means adding those matches.
+A workbook is the same document in every language: the same paragraph ids, the same MEPS
+document ids, and — this is the part that matters — the same untranslated class names in the
+markup. Measured across Spanish, English, Japanese, Arabic, Russian and Chinese.
+
+So the parser keys on structure:
+
+| what | signal |
+|---|---|
+| the three sections | the icon class on the heading's wrapper: `dc-icon--gem`, `--wheat`, `--sheep` (and the pre-2025 `…--rev2021` form) |
+| songs | a publication extract of class **31** anchored at the heading; the number is the chapter number of the songbook document it points at |
+| minutes | the digits inside the brackets a part announces its length in, read in any script |
+| part numbers | the digits that open the title, with only the separator after them removed |
+| the student Bible reading | the last part of the opening section that carries a Bible reference of its own |
+| the congregation study | the last part of the closing section whose extract parses as a chapter — the successful parse *is* the identification |
+| the accounts to read | the heading group that holds Bible references and no question or answer field |
+
+Two traps that shaped this, both measured rather than assumed:
+
+- **`RefPublication.Symbol` is translated.** The songbook is `sjj` in Spanish and English but
+  written in the local script in Arabic and Japanese. Never match a symbol; match the class.
+- **Digits are not ASCII.** Arabic writes ten minutes `١٠`, Chinese brackets it `（10分）`.
+  `\d`, `strconv.Atoi` and `^(\d+)\.` all fail silently there, which is why `digits.go` reads
+  any Unicode decimal block and why the brackets are matched in three forms.
+
+When the markup carries no section markers at all, that is not a language problem and is not
+reported as one: the parts and their text still come out and a note says the markers were
+missing. The same goes per field — a week with no congregation study (an assembly, a circuit
+overseer's visit) reports that instead of inventing one.
 
 ## The JWPUB decryption comes from sws2apps/meeting-schedules-parser
 

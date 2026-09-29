@@ -83,6 +83,18 @@ type Doc struct {
 	Pub          Pub
 }
 
+// ChapterNumber is the number a document carries inside its publication: the
+// song number in a songbook, the chapter number in a book. It is a number, so
+// it reads the same in every language — unlike the heading that announces it.
+// It returns false when the document is not in the library.
+func (s *Store) ChapterNumber(docid int) (int, bool) {
+	var n sql.NullInt64
+	if err := s.DB.QueryRow(`SELECT chapter FROM doc WHERE docid=?`, docid).Scan(&n); err != nil {
+		return 0, false
+	}
+	return int(n.Int64), n.Valid
+}
+
 // ErrNoDoc means the document is not in the library.
 var ErrNoDoc = errors.New("the document is not in the library")
 

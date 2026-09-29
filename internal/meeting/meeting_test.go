@@ -1,6 +1,7 @@
 package meeting
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ const weekHTML = `<header>
 </header>
 <div class="bodyTxt">
 <h3 id="p3" data-pid="3"><a class="xt" href="jwpub://p/S:1102016801/"><strong>Canción 1</strong></a> <strong>y oración | Parte inicial de prueba</strong> <span>(1 min.)</span></h3>
-<div><h2 id="p4" data-pid="4"><strong>PRIMERA SECCIÓN DE PRUEBA</strong></h2></div>
+<div class="du-fontSize--basePlus2 dc-icon--gem dc-icon-layout--top"><h2 id="p4" data-pid="4"><strong>PRIMERA SECCIÓN DE PRUEBA</strong></h2></div>
 <div id="f1"><figure><img src="jwpub-media://900000001_univ_cnt_1.jpg" alt="Un paisaje." width="1200" height="675"/><figcaption><p id="p40" data-pid="40">Pie de prueba.</p></figcaption></figure></div>
 <h3 id="p5" data-pid="5"><strong>1. Un título de prueba</strong></h3>
 <div><p id="p6" data-pid="6">(10 mins.)</p></div>
@@ -27,7 +28,7 @@ const weekHTML = `<header>
 <ul><li><p id="p10" data-pid="10"><a href="jwpub://b/NWTR/1:1:26-1:1:27" class="b">Gé 1:26, 27</a>. ¿Qué pregunta de prueba?</p><div class="gen-field" id="p11" data-pid="11"><label>Respuesta</label><textarea></textarea></div></li></ul>
 <h3 id="p12" data-pid="12"><strong>3. Lectura de la Biblia</strong></h3>
 <div><p id="p13" data-pid="13">(4 mins.) <a href="jwpub://b/NWTR/1:2:1-1:2:9" class="b">Gé 2:1-9</a> (<a class="xt" href="jwpub://p/S:1102018445/"><em>th</em> lección 5</a>).</p></div>
-<div><h2 id="p14" data-pid="14"><strong>SEGUNDA SECCIÓN DE PRUEBA</strong></h2></div>
+<div class="dc-icon--sheep dc-icon-layout--top dc-icon-bgColor--red-600"><h2 id="p14" data-pid="14"><strong>SEGUNDA SECCIÓN DE PRUEBA</strong></h2></div>
 <h3 id="p15" data-pid="15"><a class="xt" href="jwpub://p/S:1102016802/"><strong>Canción 2</strong></a></h3>
 <h3 id="p16" data-pid="16"><strong>4. <em>“Un video”</em></strong></h3>
 <div><p id="p17" data-pid="17">(15 mins.) Análisis con el auditorio.</p></div>
@@ -59,12 +60,12 @@ var workbook = testutil.Pub{
 	Docs:  []testutil.Doc{{ID: 1, MepsID: 202026001, Class: 106, Title: "5-11 de enero", HTML: weekHTML}},
 	Dated: [][4]any{{1, 20260105, 20260111, "p/S:202026001/1-23"}},
 	Extracts: []testutil.Extract{
-		{DocID: 1, ExtractID: 1, Link: "p/S:1102016801/", Caption: caption("sjj canción 1", "Primera canción"), HTML: "<p>letra</p>", RefDocID: 1102016801, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 3, Sort: 1},
+		{DocID: 1, ExtractID: 1, Link: "p/S:1102016801/", Caption: caption("sjj canción 1", "Primera canción"), HTML: "<p>letra</p>", RefDocID: 1102016801, RefClass: 31, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 3, Sort: 1},
 		{DocID: 1, ExtractID: 2, Link: "p/S:900000010/5-5", Caption: caption("w99 1/1 pág. 3", "Un artículo viejo"), HTML: `<p id="p5" data-pid="5"><span class="parNum" data-pnum="2"></span>Texto citado.</p>`, RefDocID: 900000010, RefSymbol: "w99", RefUndated: "w", RefIssue: 19990101, BeginPID: 7, Sort: 2},
-		{DocID: 1, ExtractID: 3, Link: "p/S:1102018445/", Caption: caption("th pág. 8", "Leer con exactitud"), HTML: "<p>lección</p>", RefDocID: 1102018445, RefSymbol: "th", RefUndated: "th", BeginPID: 13, Sort: 3},
-		{DocID: 1, ExtractID: 4, Link: "p/S:1102016802/", Caption: caption("sjj canción 2", "Segunda canción"), HTML: "<p>letra</p>", RefDocID: 1102016802, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 15, Sort: 4},
-		{DocID: 1, ExtractID: 5, Link: "p/S:1102025901/", Caption: caption("wcg págs. 4-9", "Título de prueba del capítulo"), HTML: chapterHTML, RefDocID: 1102025901, RefSymbol: "wcg", RefUndated: "wcg", BeginPID: 22, Sort: 5},
-		{DocID: 1, ExtractID: 6, Link: "p/S:1102016803/", Caption: caption("sjj canción 3", "Tercera canción"), HTML: "<p>letra</p>", RefDocID: 1102016803, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 23, Sort: 6},
+		{DocID: 1, ExtractID: 3, Link: "p/S:1102018445/", Caption: caption("th pág. 8", "Leer con exactitud"), HTML: "<p>lección</p>", RefDocID: 1102018445, RefClass: 13, RefSymbol: "th", RefUndated: "th", BeginPID: 13, Sort: 3},
+		{DocID: 1, ExtractID: 4, Link: "p/S:1102016802/", Caption: caption("sjj canción 2", "Segunda canción"), HTML: "<p>letra</p>", RefDocID: 1102016802, RefClass: 31, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 15, Sort: 4},
+		{DocID: 1, ExtractID: 5, Link: "p/S:1102025901/", Caption: caption("wcg págs. 4-9", "Título de prueba del capítulo"), HTML: chapterHTML, RefDocID: 1102025901, RefClass: 13, RefSymbol: "wcg", RefUndated: "wcg", BeginPID: 22, Sort: 5},
+		{DocID: 1, ExtractID: 6, Link: "p/S:1102016803/", Caption: caption("sjj canción 3", "Tercera canción"), HTML: "<p>letra</p>", RefDocID: 1102016803, RefClass: 31, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 23, Sort: 6},
 	},
 	Media: []testutil.Media{
 		{DocID: 1, ID: 1, File: "900000001_univ_cnt_1.jpg", Label: "Un paisaje.", Caption: "Pie de prueba.", BeginPID: 5, Width: 1200, Height: 675},
@@ -221,14 +222,180 @@ func TestIssues(t *testing.T) {
 	}
 }
 
+// Publications separate a number from its unit with a no-break space, and write
+// the number in their own script. Both have to survive the readers.
 func TestNoBreakSpaceHeadings(t *testing.T) {
-	if m := songRe.FindStringSubmatch("Canción 128"); m == nil || m[1] != "128" {
-		t.Errorf("songRe with NBSP: %v", m)
+	if n, ok := firstNumber("Canci\u00f3n\u00a0128"); !ok || n != 128 {
+		t.Errorf("a no-break space before the number: %d %v", n, ok)
 	}
-	if m := minutesRe.FindStringSubmatch("(4 mins.)"); m == nil || m[1] != "4" {
-		t.Errorf("minutesRe with NBSP: %v", m)
+	if n, ok := minutesIn("(4\u00a0mins.)"); !ok || n != 4 {
+		t.Errorf("minutes with a no-break space: %d %v", n, ok)
 	}
-	if got := partTitle("Canción 128"); got != "" {
-		t.Errorf("a song-only heading is not a part: %q", got)
+	if n, ok := minutesIn("\uff08\uff14\u00a0\u5206\uff09"); !ok || n != 4 {
+		t.Errorf("minutes in fullwidth digits: %d %v", n, ok)
+	}
+}
+
+// A heading that only announces a song is not a part of the meeting, and that
+// has to hold whatever the word for "song" is: the song is recognised by its own
+// link text, not by the sentence around it.
+func TestSongOnlyHeadingIsNotAPart(t *testing.T) {
+	for _, c := range []struct{ name, heading, link string }{
+		{"spanish", "Canci\u00f3n 128 y oraci\u00f3n", "Canci\u00f3n 128"},
+		{"english", "Song 128 and prayer", "Song 128"},
+		{"japanese", "\u6b4c 128\u3001\u7948\u308a", "\u6b4c 128"},
+		{"arabic", "\u0627\u0644\u062a\u0631\u0646\u064a\u0645\u0629 \u0661\u0662\u0668 \u0648\u0627\u0644\u0635\u0644\u0627\u0629", "\u0627\u0644\u062a\u0631\u0646\u064a\u0645\u0629 \u0661\u0662\u0668"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := partTitle(c.heading, []string{c.link}); got != "" {
+				t.Errorf("partTitle(%q) = %q, want it dropped", c.heading, got)
+			}
+		})
+	}
+	got := partTitle("Canci\u00f3n 128 y oraci\u00f3n | T\u00edtulo de la parte (1 min.)", []string{"Canci\u00f3n 128"})
+	if got != "T\u00edtulo de la parte" {
+		t.Errorf("partTitle kept %q", got)
+	}
+}
+
+// The claim this parser makes is that it reads a week by its structure, not by
+// its words. The way to test that claim is to render the same structure with
+// text and digits from scripts that share nothing, and require the same answer.
+// If any of these ever diverge, some language-specific assumption crept back in.
+func TestSameStructureAcrossScripts(t *testing.T) {
+	type lang struct {
+		name                          string
+		section1, section2            string
+		song1, song2, song3           string
+		part1, reading, study, video  string
+		mins10, mins4, mins15, mins30 string
+	}
+	langs := []lang{{
+		name: "latin", section1: "FIRST SECTION", section2: "SECOND SECTION",
+		song1: "Song 1", song2: "Song 2", song3: "Song 3",
+		part1: "1. A part", reading: "3. Bible reading", study: "5. Congregation study",
+		video: "4. “A video”", mins10: "(10 mins.)", mins4: "(4 mins.)",
+		mins15: "(15 mins.)", mins30: "(30 mins.)",
+	}, {
+		name: "arabic", section1: "القسم الأول", section2: "القسم الثاني",
+		song1: "الترنيمة ١", song2: "الترنيمة ٢", song3: "الترنيمة ٣",
+		part1: "١- جزء", reading: "٣- قراءة", study: "٥- درس", video: "٤- «فيديو»",
+		mins10: "(١٠ دقائق)", mins4: "(٤ دقائق)", mins15: "(١٥ دقيقة)", mins30: "(٣٠ دقيقة)",
+	}, {
+		name: "cjk", section1: "第一部分", section2: "第二部分",
+		song1: "歌 1", song2: "歌 2", song3: "歌 3",
+		part1: "1．一个部分", reading: "3．圣经朗读", study: "5．会众研究", video: "4．「视频」",
+		mins10: "（10分）", mins4: "（4分）", mins15: "（15分）", mins30: "（30分）",
+	}}
+
+	var want *Week
+	for _, l := range langs {
+		t.Run(l.name, func(t *testing.T) {
+			st, err := store.Open(t.TempDir(), "X")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer st.Close()
+			pub := scriptWorkbook(l.section1, l.section2, l.song1, l.song2, l.song3,
+				l.part1, l.reading, l.study, l.video, l.mins10, l.mins4, l.mins15, l.mins30)
+			if _, err := st.IndexLocal(testutil.Build(t, t.TempDir(), pub), "mwb", "202601", "X"); err != nil {
+				t.Fatal(err)
+			}
+			b := &Builder{Store: st}
+			dd, err := b.FindWorkbook(time.Date(2026, 1, 5, 0, 0, 0, 0, time.Local))
+			if err != nil || dd == nil {
+				t.Fatalf("FindWorkbook: %+v %v", dd, err)
+			}
+			w := &Week{Monday: "2026-01-05"}
+			if err := b.BuildWorkbook(w, dd.DocID, *dd); err != nil {
+				t.Fatal(err)
+			}
+
+			// The structural answers, which must not depend on the script.
+			if len(w.Songs) != 3 {
+				t.Fatalf("songs %+v", w.Songs)
+			}
+			for i, n := range []int{1, 2, 3} {
+				if w.Songs[i].Number != n {
+					t.Errorf("song %d has number %d", i, w.Songs[i].Number)
+				}
+			}
+			if w.StudentReading == nil || w.StudentReading.Range == nil {
+				t.Errorf("student reading not identified: %+v", w.StudentReading)
+			}
+			if w.CongregationStudy == nil {
+				t.Error("congregation study not identified")
+			}
+			var mins []int
+			var nums []int
+			for _, sec := range w.Sections {
+				for _, p := range sec.Parts {
+					mins = append(mins, p.Minutes)
+					nums = append(nums, p.Number)
+				}
+			}
+			got := &Week{Songs: w.Songs, Sections: w.Sections}
+			if want == nil {
+				want = got
+				if fmt.Sprint(mins) != "[10 4 15 30]" {
+					t.Errorf("minutes %v, want [10 4 15 30]", mins)
+				}
+				if fmt.Sprint(nums) != "[1 3 4 5]" {
+					t.Errorf("part numbers %v, want [1 3 4 5]", nums)
+				}
+				return
+			}
+			if fmt.Sprint(mins) != "[10 4 15 30]" {
+				t.Errorf("minutes %v differ from the latin rendering", mins)
+			}
+			if fmt.Sprint(nums) != "[1 3 4 5]" {
+				t.Errorf("part numbers %v differ from the latin rendering", nums)
+			}
+			if len(w.Sections) != len(want.Sections) {
+				t.Errorf("section count %d, want %d", len(w.Sections), len(want.Sections))
+			}
+		})
+	}
+}
+
+// scriptWorkbook renders the fixture's structure with whatever words it is
+// given, so the same skeleton can be tried in several scripts.
+func scriptWorkbook(sec1, sec2, song1, song2, song3, part1, reading, study, video,
+	m10, m4, m15, m30 string) testutil.Pub {
+	html := `<header><h1 id="p1" data-pid="1">WEEK</h1>
+<h2 id="p2" data-pid="2"><a href="jwpub://b/NWTR/1:1:1-1:1:31" class="b">GENESIS 1</a></h2></header>
+<div class="bodyTxt">
+<h3 id="p3" data-pid="3"><a class="xt" href="jwpub://p/S:1102016801/"><strong>` + song1 + `</strong></a></h3>
+<div class="dc-icon--gem dc-icon-layout--top"><h2 id="p4" data-pid="4"><strong>` + sec1 + `</strong></h2></div>
+<h3 id="p5" data-pid="5"><strong>` + part1 + `</strong></h3>
+<div><p id="p6" data-pid="6">` + m10 + `</p></div>
+<h3 id="p12" data-pid="12"><strong>` + reading + `</strong></h3>
+<div><p id="p13" data-pid="13">` + m4 + ` <a href="jwpub://b/NWTR/1:2:1-1:2:9" class="b">Ge 2:1-9</a></p></div>
+<div class="dc-icon--sheep dc-icon-layout--top"><h2 id="p14" data-pid="14"><strong>` + sec2 + `</strong></h2></div>
+<h3 id="p15" data-pid="15"><a class="xt" href="jwpub://p/S:1102016802/"><strong>` + song2 + `</strong></a></h3>
+<h3 id="p16" data-pid="16"><strong>` + video + `</strong></h3>
+<div><p id="p17" data-pid="17">` + m15 + `</p></div>
+<h3 id="p21" data-pid="21"><strong>` + study + `</strong></h3>
+<div><p id="p22" data-pid="22">` + m30 + ` <a class="xt" href="jwpub://p/S:1102025901/">chapter</a></p></div>
+<h3 id="p23" data-pid="23"><a class="xt" href="jwpub://p/S:1102016803/"><strong>` + song3 + `</strong></a></h3>
+</div>`
+	chapter := `<header><p class="contextTtl" id="p1" data-pid="1"><strong>1</strong> NAME</p>
+<h1 id="p2" data-pid="2"><strong>Chapter title</strong></h1></header>
+<div class="bodyTxt"><p id="p3" data-pid="3">A paragraph.</p>
+<h3 id="p4" data-pid="4"><strong>Accounts</strong></h3>
+<ul><li><p id="p5" data-pid="5"><a href="jwpub://b/NWTR/1:6:9-1:6:22" class="b"><strong>Ge 6:9-22</strong></a></p></li></ul>
+<h3 id="p6" data-pid="6"><strong>Questions</strong></h3>
+<p id="p7" data-pid="7"><strong>A question?</strong></p><div class="gen-field" id="p8" data-pid="8"></div>
+</div>`
+	return testutil.Pub{
+		Symbol: "mwb26", Undated: "mwb", Year: 2026, IssueTag: 20260100, Title: "Workbook",
+		Docs:  []testutil.Doc{{ID: 1, MepsID: 202026001, Class: 106, Title: "week", HTML: html}},
+		Dated: [][4]any{{1, 20260105, 20260111, "p/S:202026001/1-23"}},
+		Extracts: []testutil.Extract{
+			{DocID: 1, ExtractID: 1, Link: "p/S:1102016801/", Caption: caption("s 1", "One"), HTML: "<p>x</p>", RefDocID: 1102016801, RefClass: 31, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 3, Sort: 1},
+			{DocID: 1, ExtractID: 4, Link: "p/S:1102016802/", Caption: caption("s 2", "Two"), HTML: "<p>x</p>", RefDocID: 1102016802, RefClass: 31, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 15, Sort: 2},
+			{DocID: 1, ExtractID: 5, Link: "p/S:1102025901/", Caption: caption("b 4-9", "Chapter title"), HTML: chapter, RefDocID: 1102025901, RefClass: 13, RefSymbol: "wcg", RefUndated: "wcg", BeginPID: 22, Sort: 3},
+			{DocID: 1, ExtractID: 6, Link: "p/S:1102016803/", Caption: caption("s 3", "Three"), HTML: "<p>x</p>", RefDocID: 1102016803, RefClass: 31, RefSymbol: "sjj", RefUndated: "sjj", BeginPID: 23, Sort: 4},
+		},
 	}
 }

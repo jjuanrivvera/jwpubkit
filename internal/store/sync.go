@@ -94,7 +94,7 @@ func (s *Store) Sync(ctx context.Context, c *cdn.Client, symbol, issue string, f
 		}
 	}
 	if !cached || force {
-		logf("descargando %s (%.1f MB)…", path.Base(f.File.URL), float64(f.Filesize)/1e6)
+		logf("downloading %s (%.1f MB)…", path.Base(f.File.URL), float64(f.Filesize)/1e6)
 		t := time.Now()
 		if _, err := c.Download(ctx, f.File.URL, info.File, f.File.Checksum); err != nil {
 			return nil, err
@@ -103,7 +103,7 @@ func (s *Store) Sync(ctx context.Context, c *cdn.Client, symbol, issue string, f
 		res.DownloadMS = res.Download.Milliseconds()
 		res.Downloaded = true
 	}
-	logf("descifrando e indexando %s…", info.Key())
+	logf("decrypting and indexing %s…", info.Key())
 	stats, err := s.Index(info)
 	if err != nil {
 		return nil, err
