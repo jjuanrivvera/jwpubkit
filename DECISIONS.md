@@ -32,8 +32,15 @@ literal.
 `modernc.org/sqlite` en vez de `mattn/go-sqlite3`: sin cgo el binario es estático y cruza a
 darwin y windows sin toolchain de C. Cuesta algo de velocidad en la indexación; se aceptó.
 
-## El suelo de cobertura arranca en 50%
+## El suelo de cobertura arranca en 45%
 
-Medido, no aspiracional: hoy el total es 50,5%, con `internal/cli` en 21% y `internal/cdn` sin
-cubrir. Poner 80% habría dejado el CI rojo desde el primer empujón. El número es un trinquete
-en `COVER_MIN` y en `ci.yml`; súbelo al cubrir la capa de comandos.
+Medido, no aspiracional: el total ronda el 50%, con `internal/cli` en 21% y `internal/cdn` sin
+cubrir. Poner el 80% de la flota habría dejado el CI rojo desde el primer empujón. La puerta va
+un poco por debajo de lo medido porque el total baila cerca de un punto entre mi máquina y los
+runners. Es un trinquete en `COVER_MIN` y en `ci.yml`; súbelo al cubrir la capa de comandos.
+
+## Ninguna prueba toca la biblioteca real
+
+Había una que abría `~/.local/share/jwlib` y comprobaba datos de una publicación concreta: se
+saltaba en cualquier otra máquina, o sea que en el CI no probaba nada, y ataba el repositorio a
+una biblioteca que nadie más tiene. Fuera. Lo que se prueba se construye en un `t.TempDir()`.

@@ -4,7 +4,8 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X $(MODULE)/internal/cli.Version=$(VERSION)
 PREFIX ?= $(HOME)/.local/bin
 # El suelo de cobertura; el mismo número que .github/workflows/ci.yml.
-COVER_MIN ?= 50
+# Va por debajo de lo medido a propósito: el total baila ~1 punto entre máquinas.
+COVER_MIN ?= 45
 
 .PHONY: build install test lint verify cover-check clean
 

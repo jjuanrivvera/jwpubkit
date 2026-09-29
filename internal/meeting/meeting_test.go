@@ -1,8 +1,6 @@
 package meeting
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -214,76 +212,6 @@ func TestIssues(t *testing.T) {
 	}
 	if got := Monday(time.Date(2026, 10, 4, 12, 0, 0, 0, time.Local)).Format("2006-01-02"); got != "2026-09-28" {
 		t.Errorf("Monday(sunday) = %s", got)
-	}
-}
-
-// TestRealWeek2026_09_28 checks the acceptance facts against the real library
-// when it has the September 2026 workbook (it is skipped elsewhere). The
-// facts come from the 26-sep preparation run, made by hand on wol.
-func TestRealWeek2026_09_28(t *testing.T) {
-	dir := os.Getenv("JWLIB_HOME")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".local", "share", "jwlib")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "pubs", "mwb_S_202609.jwpub")); err != nil {
-		t.Skip("la biblioteca no tiene mwb_S_202609")
-	}
-	st, err := store.Open(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
-	b := &Builder{Store: st}
-	monday := time.Date(2026, 9, 28, 0, 0, 0, 0, time.Local)
-	dd, err := b.FindWorkbook(monday)
-	if err != nil || dd == nil {
-		t.Fatalf("FindWorkbook: %+v %v", dd, err)
-	}
-	w := &Week{}
-	if err := b.BuildWorkbook(w, dd.DocID, *dd); err != nil {
-		t.Fatal(err)
-	}
-	if w.Workbook.DocID != 202026255 {
-		t.Errorf("Guía %d, want 202026255", w.Workbook.DocID)
-	}
-	if r := w.WeeklyReading; r.Book != "Jeremías" || len(r.Chapters) != 2 || r.Chapters[0] != 38 || r.Chapters[1] != 39 {
-		t.Errorf("lectura semanal %+v", r)
-	}
-	var songs []int
-	for _, s := range w.Songs {
-		songs = append(songs, s.Number)
-	}
-	if len(songs) != 3 || songs[0] != 102 || songs[1] != 90 || songs[2] != 56 {
-		t.Errorf("canciones %v, want 102/90/56", songs)
-	}
-	if sr := w.StudentReading; sr.Ref != "Jer 38:1-13" || sr.Lesson == nil || sr.Lesson.DocID != 1102018452 || !strings.Contains(sr.Lesson.Text, "th") || !strings.Contains(sr.Lesson.Text, "12") {
-		t.Errorf("lectura del estudiante %+v %+v", sr, sr.Lesson)
-	}
-	if w.CongregationStudy == nil || w.CongregationStudy.DocID != 1102025910 || !strings.HasPrefix(w.CongregationStudy.Label, "10") {
-		t.Errorf("wcg %+v", w.CongregationStudy)
-	}
-	found := false
-	for _, v := range w.Videos {
-		found = found || v.Key == "pub-jwb-125_4_VIDEO"
-	}
-	if !found {
-		t.Errorf("falta el video de «¿Quién me tocó?»: %+v", w.Videos)
-	}
-	wanted := map[int]bool{2013043: false, 2019640: false, 2020562: false, 1102010147: false, 1102018452: false, 1102023309: false, 1102023301: false, 1102025910: false}
-	for _, sec := range w.Sections {
-		for _, p := range sec.Parts {
-			for _, r := range p.References {
-				if _, ok := wanted[r.DocID]; ok {
-					wanted[r.DocID] = true
-				}
-			}
-		}
-	}
-	for id, ok := range wanted {
-		if !ok {
-			t.Errorf("referencia %d no aparece", id)
-		}
 	}
 }
 
