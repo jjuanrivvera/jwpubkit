@@ -7,7 +7,9 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - misspell
+    # misspell queda fuera a propósito: este código se documenta en español y el
+    # diccionario es de inglés, así que marca palabras correctas ("comando" por
+    # "commando"). La alternativa era una lista de excepciones que solo crece.
     - revive
     - bodyclose
     - unconvert
@@ -18,19 +20,12 @@ linters:
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
-    misspell:
-      locale: US
     revive:
       rules:
         - name: exported
           disabled: true
   exclusions:
     rules:
-      - path: _test\.go
-        linters: [errcheck]
-      - path: '.*\.go'
-        linters: [misspell]
-        text: '(capitulo|extracto|candidatas|versiones|transcripcion|momento)'
       - path: _test\.go
         linters: [errcheck]
       - path: '.*\.go'

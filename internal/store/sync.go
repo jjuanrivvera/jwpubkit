@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -124,16 +125,35 @@ func (s *Store) IndexLocal(file, symbol, issue, lang string) (*IndexStats, error
 	if err != nil {
 		return nil, err
 	}
+	// filepath.Base descarta cualquier ruta que traiga el nombre, así que la copia
+	// no puede salir de la carpeta de publicaciones.
 	dest := filepath.Join(s.PubsDir(), filepath.Base(file))
 	if abs, _ := filepath.Abs(file); abs != dest {
-		b, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		if err := os.WriteFile(dest, b, 0o644); err != nil {
+		if err := copyFile(file, dest); err != nil {
 			return nil, err
 		}
 	}
 	return s.Index(PubInfo{Symbol: symbol, Issue: NormalizeIssue(issue), Lang: lang, File: dest, MD5: sum, Size: st.Size(),
 		Modified: st.ModTime().Format("2006-01-02 15:04:05")})
+}
+
+// copyFile copia en streaming: un .jwpub puede pesar cientos de megas y no hay razón
+// para tenerlo entero en memoria.
+func copyFile(src, dest string) error {
+	// #nosec G304,G703 -- src es exactamente el archivo que el usuario nombró en
+	// --archivo; leerlo es lo que pidió el comando.
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }

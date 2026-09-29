@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,6 +120,12 @@ func (jf *File) openZips() error {
 	// "contents" is normally stored uncompressed, so the inner zip can be read
 	// in place instead of copying a 300 MB entry into memory.
 	var ra io.ReaderAt
+	// El tamaño viene de la cabecera del zip, que la trae el archivo: un .jwpub
+	// manipulado puede declarar más de lo que cabe en un int64 y dejar un tamaño
+	// negativo con el que io.NewSectionReader leería cualquier cosa.
+	if contents.UncompressedSize64 > math.MaxInt64 {
+		return fmt.Errorf("contents declara un tamaño imposible (%d bytes)", contents.UncompressedSize64)
+	}
 	size := int64(contents.UncompressedSize64)
 	if contents.Method == zip.Store {
 		off, err := contents.DataOffset()
