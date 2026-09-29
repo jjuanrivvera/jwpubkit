@@ -63,7 +63,7 @@ type imageOut struct {
 // termOut is a capitalised word found in the chapter's study notes and
 // footnotes that has an article of its own in the encyclopedia.
 //
-// It is NOT a list of places, and used to be labelled as one. Measured on one
+// It is NOT a list of places, and used to be labeled as one. Measured on one
 // chapter: of seven candidates three were the names of publications picked out
 // of citations, and seven real places in the same notes were missed. Nothing in
 // any publication marks an article as being about a place — an article on a

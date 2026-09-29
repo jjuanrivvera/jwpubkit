@@ -55,7 +55,7 @@ in the same command as the check, which guaranteed the result it was supposed to
 
 ## The dossier's term list is not a place list, and no longer says it is
 
-It was labelled "places". Measured on one chapter: of seven candidates, three were the names
+It was labeled "places". Measured on one chapter: of seven candidates, three were the names
 of publications picked out of citations, and seven real places in the same notes were missed.
 Nothing in any publication marks an article as being about a place — an article on a city and
 an article on an abstract noun carry the same class and type — so the label was a claim the
@@ -108,7 +108,7 @@ Counting words to estimate reading time is wrong for scripts written without spa
 paragraph would come out as a couple of seconds. Words are counted where the script separates
 them and characters where it does not, each at its own rate, decided by the text rather than by
 a language setting so a quotation in another script is still counted sensibly. The rates are
-assumptions, labelled as such in the output and overridable.
+assumptions, labeled as such in the output and overridable.
 
 ## Removing a library is a command, because doing it by hand is a trap
 
