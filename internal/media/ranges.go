@@ -58,7 +58,7 @@ func (p *rangeProxy) block(ctx context.Context, offset int64) ([]byte, int64, er
 	}
 	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", offset, end))
 	req.Header.Set("Accept-Encoding", "identity")
-	c.last = time.Now()
+	defer func() { c.last = time.Now() }()
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, 0, err
