@@ -211,6 +211,42 @@ start/end, effective duration and measured bytes. `copy` keeps the original code
 start at a keyframe; `exact` reencodes. Output size limiting can shorten a clip, in which case
 the command fails instead of publishing it. Audio frame rounding can slightly extend duration.
 
+Use `--no-audio` for a silent MP4, or `--audio-only --output fragment.m4a` for
+an audio-only M4A. These flags are mutually exclusive. `copy` requires an audio codec
+supported by M4A; use `--mode exact` to encode AAC. An absent requested track is an error.
+
+### `media frame`
+
+```sh
+pubkit media frame pub-jwbvod26_16_VIDEO --at 08:12 --resolution 240p --output frame.jpg
+pubkit media frame pub-jwbvod26_16_VIDEO --at 08:12 --at 08:18 \
+  --format png --output frames --contact-sheet contact.png --json
+pubkit media frame pub-jwbvod26_16_VIDEO --every 5 --from 08:12 --to 08:32 \
+  --output frames --contact-sheet contact.jpg --columns 3
+```
+
+Requires `ffmpeg`. Times accept seconds, `mm:ss` or `hh:mm:ss`, with fractional seconds.
+Repeat `--at`, or use a positive `--every` interval with both bounds; `--to` is inclusive
+when it lies on the interval, and every mark must be before the video end. A batch is
+limited to 100 marks. `--format jpg` is the default; PNG is also supported. For one mark,
+`--output` is a new image path with the matching extension; for multiple marks it is a
+directory. Without it, names are derived from the key and requested milliseconds.
+
+The optional contact sheet fits thumbnails in a grid and labels them with requested
+hours, minutes, seconds and milliseconds. Original images are kept. JSON reports each
+requested time, dimensions and path, plus aggregate output and received bytes. A frame
+is the first decoded video frame at or after the requested time, subject to frame-rate
+rounding. Batches stage and decode all images before publishing them and preserve
+existing output paths; a failed publication rolls back images created by that batch.
+
+Only bounded 256 KiB byte ranges reach the origin. An in-memory cache shares MP4 index
+and video blocks between marks, and `--interval 1s` pauses between uncached requests.
+Traffic includes downloaded blocks, including partial or discarded reads; it excludes
+HTTP headers. `--traffic-bytes` defaults to 30 MB across the entire batch, and
+`--output-bytes` to 20 MB including the sheet. There is no full-file download fallback.
+Seeking still needs the MP4 index and a preceding keyframe; bytes depend on file layout,
+resolution and keyframe spacing. Nearby marks normally reuse cached blocks.
+
 ### `reading-time`
 
 How long something takes to read aloud — a document, a passage, or text piped in:
