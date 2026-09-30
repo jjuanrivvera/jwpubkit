@@ -284,13 +284,17 @@ libraries that would cost hours to download again. `JWPUBKIT_HOME` is the curren
 cross-compiles to darwin and windows with no C toolchain. It costs some indexing speed, which
 was accepted.
 
-## The coverage floor starts at 45%
+## The coverage floor is a ratchet, and it moved
 
-Measured, not aspirational: the total sits around 50%, with `internal/cli` near 21% and
-`internal/cdn` uncovered. The fleet's 80% would have left CI red from the first push. The gate
-sits a little under the measured number because the total drifts about a point between
-machines. It is a ratchet in `COVER_MIN` and in `ci.yml`; raise it as the command layer gets
-covered.
+Started at 45%, raised to 50% on 2026-09-30 when the measured total reached 55.6%. The rule is
+the same each time: the floor goes a little under what is measured, because the total drifts
+about a point between machines, and it only ever goes up.
+
+### Where it started
+
+Measured, not aspirational: the total was around 50%, with `internal/cli` near 21% and
+`internal/cdn` uncovered. The fleet's 80% would have left CI red from the first push. The number
+lives in two places that move together, `COVER_MIN` and `ci.yml`.
 
 ## No test touches a real library
 
