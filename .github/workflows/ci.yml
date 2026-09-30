@@ -5,6 +5,14 @@ on:
     branches: [main, develop]
   pull_request:
   workflow_dispatch:
+  # A release fast-forwards main using GITHUB_TOKEN, and a push made with that
+  # token does not trigger workflows — so main never re-ran CI and its badge sat
+  # on the very first, failing run while develop went green nine times. This runs
+  # CI on the default branch once the release is done, which is what the badge
+  # reports.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
 
 permissions:
   contents: read
