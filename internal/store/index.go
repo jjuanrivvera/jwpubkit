@@ -49,7 +49,7 @@ func (st IndexStats) String() string {
 	}
 	s += fmt.Sprintf(", %d bible citations, %d media, %d extracts", st.Cites, st.Media, st.Extracts)
 	if st.Dated > 0 {
-		s += fmt.Sprintf(", %d semanas", st.Dated)
+		s += fmt.Sprintf(", %d weeks", st.Dated)
 	}
 	return s
 }

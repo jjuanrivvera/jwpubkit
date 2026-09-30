@@ -33,6 +33,12 @@ func (ix *indexer) indexGlossary(docid int, html string) error {
 		return err
 	}
 	defer ins.Close()
+	// Spellings that fold to the same key are the same way in, and the row is
+	// keyed by that fold — so the first spelling has to win. A publication
+	// writes the principal form first ("Bramblewort, Bramble-wort"), and
+	// letting the last one overwrite it would display the variant as if it
+	// were the word.
+	seen := map[string]bool{}
 	for _, b := range doc.Blocks {
 		if b.Kind != content.KindDefinition || b.Term == "" {
 			continue
@@ -40,9 +46,10 @@ func (ix *indexer) indexGlossary(docid int, html string) error {
 		// One entry can define several forms of a word; each is a way in.
 		for _, term := range strings.Split(b.Term, ",") {
 			key := FoldTerm(term)
-			if key == "" {
+			if key == "" || seen[key] {
 				continue
 			}
+			seen[key] = true
 			if _, err := ins.Exec(ix.pubID, docid, b.PID, key, strings.TrimSpace(term), b.Text()); err != nil {
 				return err
 			}
