@@ -9,6 +9,8 @@
 [![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+![pubkit in action](assets/demo.gif)
+
 </div>
 
 `pubkit` downloads publications in JWPUB format from the open jw.org CDN, decrypts them and

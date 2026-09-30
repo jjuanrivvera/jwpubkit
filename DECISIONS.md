@@ -2,6 +2,19 @@
 
 Assumptions that cost a decision. Read them back instead of deciding again.
 
+## The demo recording, and the one thing in it that is real
+
+`assets/demo.gif` is recorded against a **synthetic library** built by
+`go run ./tools/demolib`: every publication title, article and paragraph on screen is invented,
+with the real shapes, classes and link targets so the commands behave normally.
+
+The exception is the Bible passage, which is real. Juan allowed that specifically on
+2026-09-30, after the question was put to him — a recording is a picture, where nothing can be
+argued to be structure, so it needed an explicit decision rather than an inference. Nothing
+else from a publication appears in it, and only the rendered GIF is committed.
+
+If you re-record it, keep that line: synthetic for everything the tool reads, the passage aside.
+
 ## The repository ships no publications — not even in the tests
 
 The tests run on invented HTML shaped like the real thing. That is what makes the code

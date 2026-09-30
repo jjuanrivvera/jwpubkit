@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -78,20 +79,45 @@ type Media struct {
 // Build writes the JWPUB into dir and returns its path.
 func Build(t testing.TB, dir string, p Pub) string {
 	t.Helper()
+	path, err := BuildE(dir, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// BuildE is Build without a test to report to, so a tool can make a synthetic
+// library too — the demo recording needs one, because a demo of this tool that
+// showed real output would be publication content in a picture, inside the repo.
+func BuildE(dir string, p Pub) (path string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("building %s: %v", p.Symbol, r)
+		}
+	}()
+	return buildPub(dir, p), nil
+}
+
+func buildPub(dir string, p Pub) string {
 	card := jwpub.Card{MepsLanguageIndex: 1, Symbol: p.Symbol, Year: p.Year, IssueTagNumber: p.IssueTag}
 	ci := jwpub.NewCipher(card)
 	enc := func(s string) []byte {
 		b, err := ci.Encrypt([]byte(s))
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		return b
 	}
 
-	dbPath := filepath.Join(t.TempDir(), p.Symbol+".db")
+	work, err := os.MkdirTemp("", "jwpubkit-fixture-")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(work)
+	dbPath := filepath.Join(work, p.Symbol+".db")
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	stmts := []string{
 		`CREATE TABLE Publication(PublicationId INTEGER, Title TEXT, ShortTitle TEXT, Symbol TEXT, UndatedSymbol TEXT, Year INTEGER,
@@ -119,13 +145,12 @@ func Build(t testing.TB, dir string, p Pub) string {
 	}
 	for _, q := range append(stmts, p.ExtraSQL...) {
 		if _, err := db.Exec(q); err != nil {
-			t.Fatalf("%s: %v", q, err)
+			panic(fmt.Sprintf("%s: %v", q, err))
 		}
 	}
 	mustExec := func(q string, args ...any) {
-		t.Helper()
 		if _, err := db.Exec(q, args...); err != nil {
-			t.Fatalf("%s: %v", q, err)
+			panic(fmt.Sprintf("%s: %v", q, err))
 		}
 	}
 	mustExec(`INSERT INTO Publication VALUES(1,?,?,?,?,?,?,1,'Test','t',0,0)`, p.Title, p.Title, p.Symbol, p.Undated, p.Year, p.IssueTag)
@@ -157,11 +182,11 @@ func Build(t testing.TB, dir string, p Pub) string {
 		mustExec(`INSERT INTO BibleChapter VALUES(1,0,0,?)`, enc("<p></p>"))
 	}
 	if err := db.Close(); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	dbBytes, err := os.ReadFile(dbPath)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	var inner bytes.Buffer
@@ -169,7 +194,7 @@ func Build(t testing.TB, dir string, p Pub) string {
 	add := func(name string, data []byte) {
 		w, err := zw.Create(name)
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		w.Write(data)
 	}
@@ -178,7 +203,7 @@ func Build(t testing.TB, dir string, p Pub) string {
 		add(p.ImageName, p.ImageData)
 	}
 	if err := zw.Close(); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	manifest, _ := json.Marshal(map[string]any{
@@ -192,15 +217,15 @@ func Build(t testing.TB, dir string, p Pub) string {
 	// in-place reader.
 	cw, err := ow.CreateHeader(&zip.FileHeader{Name: "contents", Method: zip.Store})
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	cw.Write(inner.Bytes())
 	if err := ow.Close(); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	path := filepath.Join(dir, p.Symbol+".jwpub")
 	if err := os.WriteFile(path, outer.Bytes(), 0o644); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	return path
 }
