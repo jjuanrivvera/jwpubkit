@@ -122,7 +122,7 @@ Library: ~/.local/share/jwlib (change it with --library, JWPUBKIT_HOME or JWLIB_
 	pf.BoolVar(&a.offline, "offline", false, "stay off the network (no sync, no CDN lookups)")
 	pf.StringVar(&a.lang, "language", a.settle("language", defaultLang, a.cfg.Language, "JWPUBKIT_LANG"), "publication language (jw.org symbol: E english, S spanish, F french…)")
 	pf.BoolVarP(&a.quiet, "quiet", "q", false, "do not print progress on stderr")
-	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.readingTimeCmd(), a.chainCmd(), a.completionCmd(), a.versionCmd())
+	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.readingTimeCmd(), a.chainCmd(), a.graphCmd(), a.completionCmd(), a.versionCmd())
 	return root
 }
 
@@ -163,7 +163,7 @@ func (a *app) store() (*store.Store, error) {
 	if a.st != nil {
 		return a.st, nil
 	}
-	st, err := store.Open(a.libDir, a.lang)
+	st, err := store.OpenWithProgress(a.libDir, a.lang, a.logf)
 	if err != nil {
 		return nil, fmt.Errorf("opening the library %s: %w", a.libDir, err)
 	}

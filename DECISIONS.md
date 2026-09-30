@@ -66,6 +66,61 @@ The lookup itself should move to the encyclopedia's own topic table (6 444 alias
 present in every language it is published in) rather than exact title matching. That is a
 separate, additive piece of work.
 
+## A question is evidence, not a requirement
+
+The all-words search returned nothing for five of six questions someone actually asked while
+preparing — "¿Cómo consolar a alguien que perdió a un ser querido?" has no paragraph containing
+every one of its words, and no publication is written to. Measured before and after on the real
+library: 0, 6, 0, 0, 0, 0 became 6, 6, 6, 6, 6, 6, with an article leading every one of them.
+
+So the words are taken as evidence: those that narrow anything down are searched for, a
+paragraph matching most of them counts, and the ranking prefers prose. `--all-words` keeps the
+old behaviour for the cases that want it.
+
+**Which words narrow anything down is measured, not listed.** A term matching more than a fifth
+of the library's paragraphs cannot tell two of them apart, and that is checked against the
+library — so no stopword list is carried for any of the thousand languages jw.org publishes in.
+The rule needs data to mean something: under a few hundred paragraphs it stays out of the way,
+because a word in two of three paragraphs is a small library, not a stopword. Getting that wrong
+made the search return nothing at all, which is how it was found.
+
+**Index entries and covers are demoted, not dropped.** The noise in an OR search is
+navigational: tables of contents, covers, word indexes, the per-month container of a daily-text
+publication. They are identified by MEPS document class, which is the same in every language,
+and pushed below prose while staying visible and labelled — because "which index entry covers
+this" is a fair question, just not the usual one.
+
+## The graph was already in the library; what was missing was a way to walk it
+
+Publications state their own links: a citation, a marginal reference, an extract of one work
+inside another, a video embedded in an article, a term a study note defines. `pubkit graph`
+walks them from a passage or a document, and **every edge names the table it came from**, so an
+answer can be checked instead of trusted. Nothing is inferred and no model is involved.
+
+The one edge nobody writes down is co-citation — the passages quoted in the same paragraph as
+this one — and it is the most useful: two verses taught together forty times are being taught
+together. It comes from joining the citation table to itself.
+
+Caps are per relation, because a much-quoted verse has hundreds of citing documents and an
+uncapped answer is unreadable rather than thorough.
+
+### Phase two, designed and deliberately not built
+
+Searching by meaning belongs in a **separate binary in this repository**, not in `pubkit`:
+
+- `pubkit` stays dependency-light and starts in milliseconds; an embedding model does not.
+- The index is a **sidecar** beside the library (`<library>/semantic.<lang>.idx`), never inside
+  `jwlib*.db`, so it can be deleted, rebuilt or ignored without touching what is authoritative.
+- A small CPU model, quantised, over paragraphs already in `par` — the text never leaves the
+  machine, which is the same constraint everything else here works under.
+- It answers only what this phase cannot: a question sharing no vocabulary with its answer. The
+  ranking still has to put prose first and name its evidence, and where the two disagree the
+  deterministic answer is the one that can be checked.
+
+What makes that buildable now is that this phase gave it its inputs: `Question` already separates
+signal words from noise, `documentKind` already knows what a document is for, and every hit
+already carries a citation and an address.
+
 ## A library holds several Bibles, and reads name the one they want
 
 A study edition and a plain edition carry the same BibleVerseId for every verse, and the

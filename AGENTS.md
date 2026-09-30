@@ -59,6 +59,16 @@ The Spanish command and flag names the CLI shipped with are kept as aliases
 - `internal/subs` — video subtitles.
 - `internal/cli` — the cobra tree. One file per command.
 
+## Searching and the graph
+
+`search` treats a question as evidence: the words that narrow anything down (measured against
+the library, never a stopword list) are searched for, most-matching paragraphs win, and prose
+outranks index entries and covers by MEPS document class. `--all-words` is the old strict
+search. `graph` walks the links publications state themselves and every edge carries the table
+it came from — if you add an edge, add its provenance with it.
+
+Searching by meaning is deliberately not here; DECISIONS.md says where it goes and why.
+
 ## House rules
 
 - Comments explain **why**, not what.

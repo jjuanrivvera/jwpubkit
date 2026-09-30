@@ -178,6 +178,9 @@ type SearchHit struct {
 	Issue string `json:"number,omitempty"`
 	// Cite is that citation, e.g. "w24.05 par. 3".
 	Cite string `json:"cite"`
+	// Kind says what the document is for: an article, an index entry, or
+	// navigation such as a cover or a table of contents.
+	Kind string `json:"kind,omitempty"`
 }
 
 // FTSQuery turns user words into an FTS5 query: every word must appear,
@@ -284,8 +287,8 @@ func (s *Store) Search(query string, pubs []string, limit int) ([]SearchHit, err
 		if err := rows.Scan(&h.DocID, &h.Pub, &h.PubKey, &h.Title, &h.PID, &h.Num, &h.Snippet, &h.Matches, &h.Rank, &h.Issue); err != nil {
 			return nil, err
 		}
-		h.URL = content.DocURL(h.DocID, h.PID)
-		h.Cite = content.Cite("", h.Pub, h.Issue, 0, h.Num, h.DocID, h.PID).Text
+		h.URL = contentDocURL(h.DocID, h.PID)
+		h.Cite = citeOf(h.Pub, h.Issue, h.Num, h.DocID, h.PID)
 		out = append(out, h)
 	}
 	return out, rows.Err()
@@ -848,4 +851,12 @@ func definitionsIn(html string) []Definition {
 		out = append(out, Definition{Term: term, DocID: docid, URL: content.DocURL(docid, 0)})
 	}
 	return out
+}
+
+// contentDocURL and citeOf keep the two places that build an address and a
+// citation reading the same.
+func contentDocURL(docid, pid int) string { return content.DocURL(docid, pid) }
+
+func citeOf(symbol, issue string, paragraph, docid, pid int) string {
+	return content.Cite("", symbol, issue, 0, paragraph, docid, pid).Text
 }

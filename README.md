@@ -170,6 +170,20 @@ What the library currently holds:
 pubkit pubs --json
 ```
 
+### `graph`
+
+Walk the connections the publications already state, from a passage or a document — who quotes
+it, what its margin points at, what is quoted alongside it, which videos the citing articles
+embed, which terms its notes define:
+
+```sh
+pubkit graph "Jer 38:6"
+pubkit graph 1102025901 --json
+pubkit graph "Ps 23:1" --only cited-alongside --per-relation 40
+```
+
+Every edge names the table it came from, so an answer can be checked. Nothing is inferred.
+
 ### `chain`
 
 Follow the marginal references out of a passage, as far as you ask, with each verse's text:

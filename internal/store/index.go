@@ -247,6 +247,9 @@ func (ix *indexer) documents() error {
 		if htmlText == "" {
 			continue
 		}
+		if err := ix.indexDocVideos(docid, parsedVideos(htmlText)); err != nil {
+			return err
+		}
 		if class.Int64 == glossaryClass {
 			if err := ix.indexGlossary(docid, htmlText); err != nil {
 				return err
@@ -710,4 +713,44 @@ func (ix *indexer) studyNotes() error {
 		ix.stats.Notes++
 	}
 	return rows.Err()
+}
+
+// parsedVideos lists the videos a document embeds. Parsing failures are not worth
+// failing a sync over: the document is indexed either way and the edge is simply
+// missing.
+func parsedVideos(html string) []string {
+	if html == "" {
+		return nil
+	}
+	d, err := content.Parse(html)
+	if err != nil {
+		return nil
+	}
+	var keys []string
+	seen := map[string]bool{}
+	for _, v := range d.Videos {
+		if v.Key == "" || seen[v.Key] {
+			continue
+		}
+		seen[v.Key] = true
+		keys = append(keys, v.Key)
+	}
+	return keys
+}
+
+func (ix *indexer) indexDocVideos(docid int, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	ins, err := ix.tx.Prepare(`INSERT OR REPLACE INTO doc_video(docid, pub_id, key) VALUES(?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer ins.Close()
+	for _, k := range keys {
+		if _, err := ins.Exec(docid, ix.pubID, k); err != nil {
+			return err
+		}
+	}
+	return nil
 }

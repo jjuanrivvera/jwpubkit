@@ -182,10 +182,18 @@ downloaded by this command.`,
 				store.CueHit
 				Timestamp string `json:"timestamp"`
 				URL       string `json:"url"`
+				// UsedIn are the documents that embed this video, which is what
+				// turns "the phrase is at 1:04" into "and it belongs to this part
+				// of this article".
+				UsedIn []store.Edge `json:"used_in,omitempty"`
 			}
 			out := make([]found, 0, len(hits))
 			for _, h := range hits {
-				out = append(out, found{CueHit: h, Timestamp: subs.FormatTS(h.Start), URL: subs.WatchURL(h.Key, h.Lang, h.Seconds)})
+				f := found{CueHit: h, Timestamp: subs.FormatTS(h.Start), URL: subs.WatchURL(h.Key, h.Lang, h.Seconds)}
+				if docs, err := st.VideoDocuments(h.Key, 3); err == nil {
+					f.UsedIn = docs
+				}
+				out = append(out, f)
 			}
 			if a.jsonOut {
 				return a.printJSON(map[string]any{"query": args[0], "hits": out})
@@ -203,6 +211,9 @@ downloaded by this command.`,
 				a.printf("%-28s %7s  %s\n", h.Key, h.Timestamp, h.Title)
 				a.printf("%38s%s\n", "", h.Snippet)
 				a.printf("%38s%s\n", "", h.URL)
+				for _, d := range h.UsedIn {
+					a.printf("%38sused in %s  %s\n", "", d.Cite, d.Title)
+				}
 			}
 			return nil
 		},

@@ -29,6 +29,9 @@ type Store struct {
 
 	// bibleID caches which of the library's Bibles verses are read from.
 	bibleID int64
+
+	// Progress, when set, is told about work that takes long enough to notice.
+	Progress func(format string, args ...any)
 }
 
 // DefaultDir is $JWPUBKIT_HOME, else $JWLIB_HOME, else $XDG_DATA_HOME/jwlib, else
@@ -98,7 +101,11 @@ func languageOf(path string) (string, error) {
 }
 
 // Open opens (and creates or migrates) the library in dir for one language.
-func Open(dir, lang string) (*Store, error) {
+func Open(dir, lang string) (*Store, error) { return OpenWithProgress(dir, lang, nil) }
+
+// OpenWithProgress is Open with somewhere to report one-off work that takes long
+// enough for a user to wonder whether anything is happening.
+func OpenWithProgress(dir, lang string, progress func(string, ...any)) (*Store, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "pubs"), 0o755); err != nil {
 		return nil, err
 	}
@@ -109,13 +116,86 @@ func Open(dir, lang string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{DB: db, Dir: dir, Lang: lang, Path: path}
+	s := &Store{DB: db, Dir: dir, Lang: lang, Path: path, Progress: progress}
 	if err := s.migrate(); err != nil {
 		db.Close()
 		return nil, err
 	}
 	s.teachBookNames()
+	if err := s.backfillDocVideos(); err != nil {
+		return nil, err
+	}
 	return s, nil
+}
+
+// backfillDocVideos fills the document-to-video table from the HTML the library
+// already stores, once.
+//
+// The alternative was asking for a re-sync of every publication to record an edge
+// that is already on disk — over a gigabyte of downloads for a table that can be
+// derived from what is here. It runs once, marks itself done, and says so while it
+// works, because a first command that takes half a minute with no explanation is
+// indistinguishable from a hang.
+func (s *Store) backfillDocVideos() error {
+	var done string
+	if err := s.DB.QueryRow(`SELECT value FROM meta WHERE key='doc_video_backfill'`).Scan(&done); err == nil && done == "1" {
+		return nil
+	}
+	var docs int
+	if err := s.DB.QueryRow(`SELECT count(*) FROM doc WHERE html <> ''`).Scan(&docs); err != nil || docs == 0 {
+		// Nothing indexed yet: the table will fill as publications are synced.
+		_, err := s.DB.Exec(`INSERT OR REPLACE INTO meta(key, value) VALUES('doc_video_backfill','1')`)
+		return err
+	}
+	if s.Progress != nil {
+		s.Progress("recording which documents embed which video, once (%d documents)", docs)
+	}
+	rows, err := s.DB.Query(`SELECT docid, pub_id, html FROM doc WHERE html <> ''`)
+	if err != nil {
+		return err
+	}
+	type found struct {
+		docid, pubID int
+		keys         []string
+	}
+	var all []found
+	for rows.Next() {
+		var docid, pubID int
+		var html string
+		if err := rows.Scan(&docid, &pubID, &html); err != nil {
+			rows.Close()
+			return err
+		}
+		if keys := parsedVideos(html); len(keys) > 0 {
+			all = append(all, found{docid, pubID, keys})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // rolled back only when Commit did not run
+	ins, err := tx.Prepare(`INSERT OR REPLACE INTO doc_video(docid, pub_id, key) VALUES(?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer ins.Close()
+	for _, f := range all {
+		for _, k := range f.keys {
+			if _, err := ins.Exec(f.docid, f.pubID, k); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err := tx.Exec(`INSERT OR REPLACE INTO meta(key, value) VALUES('doc_video_backfill','1')`); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // migrateVerses rebuilds the verse table when it still uses the old layout, in
@@ -253,6 +333,15 @@ func (s *Store) migrate() error {
 
 // additiveSchema holds tables that are safe to create on an existing library.
 const additiveSchema = `
+-- Which documents embed which video. The link lives in the document markup, so
+-- without recording it the only way to answer "where is this video used" would be
+-- to re-parse every document in the library.
+CREATE TABLE IF NOT EXISTS doc_video(
+	docid INTEGER NOT NULL, pub_id INTEGER NOT NULL, key TEXT NOT NULL,
+	PRIMARY KEY(docid, key)
+);
+CREATE INDEX IF NOT EXISTS doc_video_key ON doc_video(key);
+
 -- The entries of any glossary the library holds, so a study note's "see
 -- Glossary, X" can be answered offline when the publication carrying it is
 -- synced. The term is stored folded for lookup and as published for display.
