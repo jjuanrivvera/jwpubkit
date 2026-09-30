@@ -90,7 +90,9 @@ type Doc struct {
 // ChapterNumber is the number a document carries inside its publication: the
 // song number in a songbook, the chapter number in a book. It is a number, so
 // it reads the same in every language — unlike the heading that announces it.
-// It returns false when the document is not in the library.
+// It returns false when there is no number to give: either the document is not
+// in the library, or it carries no chapter. The two are not distinguished,
+// because no caller has anything different to do about them.
 func (s *Store) ChapterNumber(docid int) (int, bool) {
 	var n sql.NullInt64
 	if err := s.queryRow(`SELECT chapter FROM doc WHERE docid=?`, docid).Scan(&n); err != nil {
