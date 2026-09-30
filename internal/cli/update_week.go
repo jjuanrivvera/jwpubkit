@@ -14,6 +14,7 @@ import (
 )
 
 type weekUpdateRow struct {
+	DocID  int    `json:"docid,omitempty"`
 	Kind   string `json:"kind"`
 	Key    string `json:"key"`
 	Symbol string `json:"symbol,omitempty"`
@@ -30,7 +31,8 @@ type weekUpdateOut struct {
 }
 
 func (a *app) updateWeekCmd() *cobra.Command {
-	var dryRun bool
+	var dryRun, withReferences bool
+	var interval time.Duration
 	cmd := &cobra.Command{
 		Use: "update-week [YYYY-MM-DD]", Aliases: []string{"semanal"},
 		Short: "Sync the week's workbook, study issues and referenced video subtitles",
@@ -41,6 +43,9 @@ fallback logic. Video failures are reported without failing the whole update.
 only be listed when the week's workbook is already indexed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if interval < 0 {
+				return fmt.Errorf("interval must not be negative")
+			}
 			day, err := commandDate(args)
 			if err != nil {
 				return err
@@ -62,6 +67,9 @@ only be listed when the week's workbook is already indexed.`,
 				return err
 			}
 			out, updateErr := a.updateWeek(st, meeting.Monday(day), dryRun)
+			if withReferences && updateErr == nil {
+				updateErr = a.updateReferences(st, meeting.Monday(day), dryRun, interval, out)
+			}
 			if a.jsonOut {
 				if err := a.printJSON(out); err != nil {
 					return err
@@ -81,6 +89,8 @@ only be listed when the week's workbook is already indexed.`,
 			return updateErr
 		},
 	}
+	cmd.Flags().BoolVar(&withReferences, "with-references", false, "also sync missing publications named by workbook extracts")
+	cmd.Flags().DurationVar(&interval, "interval", 2*time.Second, "pause between referenced publication requests")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report planned work without network or writes")
 	return cmd
 }

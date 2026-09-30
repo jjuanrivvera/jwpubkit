@@ -8,15 +8,17 @@ import (
 
 // PlaceSource is evidence from a publication, never an inferred map location.
 type PlaceSource struct {
-	Kind        string        `json:"kind"`
-	Source      string        `json:"source"`
-	DocID       int           `json:"docid"`
-	Title       string        `json:"title"`
-	Publication string        `json:"publication"`
-	Key         string        `json:"key"`
-	URL         string        `json:"url"`
-	Names       []string      `json:"names"`
-	Images      []PlaceFigure `json:"images"`
+	Classification      string        `json:"classification"`
+	ClassificationBasis string        `json:"classification_basis"`
+	Kind                string        `json:"kind"`
+	Source              string        `json:"source"`
+	DocID               int           `json:"docid"`
+	Title               string        `json:"title"`
+	Publication         string        `json:"publication"`
+	Key                 string        `json:"key"`
+	URL                 string        `json:"url"`
+	Names               []string      `json:"names"`
+	Images              []PlaceFigure `json:"images"`
 }
 
 // PlaceFigure describes media without claiming a name-to-image association.

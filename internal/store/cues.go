@@ -28,6 +28,9 @@ func (s *Store) PutCues(key, lang string, starts, ends []time.Duration, texts []
 	}
 	defer tx.Rollback() //nolint:errcheck // rolled back only if Commit did not happen
 
+	if _, err := tx.Exec(`DELETE FROM cue_window_fts WHERE rowid IN (SELECT rowid FROM cue WHERE key=? AND lang=?)`, key, lang); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM cue_fts WHERE rowid IN (
 		SELECT rowid_ FROM cue_map WHERE key=? AND lang=?)`, key, lang); err != nil {
 		return err
@@ -78,7 +81,7 @@ func (s *Store) PutCues(key, lang string, starts, ends []time.Duration, texts []
 // HasCues reports whether a video's transcript is already recorded.
 func (s *Store) HasCues(key, lang string) bool {
 	var n int
-	if err := s.DB.QueryRow(`SELECT count(*) FROM cue WHERE key=? AND lang=?`, key, lang).Scan(&n); err != nil {
+	if err := s.queryRow(`SELECT count(*) FROM cue WHERE key=? AND lang=?`, key, lang).Scan(&n); err != nil {
 		return false
 	}
 	return n > 0
@@ -108,7 +111,7 @@ func (s *Store) SearchCues(query, lang string, limit int) ([]CueHit, error) {
 		args = append(args, lang)
 	}
 	args = append(args, limit)
-	rows, err := s.DB.Query(`
+	rows, err := s.query(`
 		SELECT c.key, c.lang, c.seq, c.start_ms, c.end_ms, c.text,
 		       COALESCE(v.title,''), snippet(cue_fts, 0, '«', '»', '…', 12)
 		FROM cue_fts f
@@ -138,7 +141,7 @@ func (s *Store) SearchCues(query, lang string, limit int) ([]CueHit, error) {
 
 // CuesOf returns a video's whole transcript in order.
 func (s *Store) CuesOf(key, lang string) ([]Cue, error) {
-	rows, err := s.DB.Query(`SELECT seq, start_ms, end_ms, text FROM cue
+	rows, err := s.query(`SELECT seq, start_ms, end_ms, text FROM cue
 		WHERE key=? AND lang=? ORDER BY seq`, key, lang)
 	if err != nil {
 		return nil, err
@@ -169,7 +172,7 @@ func (s *Store) CueVideoCount(lang string) (int, error) {
 		args = append(args, lang)
 	}
 	var n int
-	err := s.DB.QueryRow(q, args...).Scan(&n)
+	err := s.queryRow(q, args...).Scan(&n)
 	return n, err
 }
 

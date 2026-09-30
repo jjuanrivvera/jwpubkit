@@ -377,6 +377,11 @@ func (s *Store) migrate() error {
 
 // additiveSchema holds tables that are safe to create on an existing library.
 const additiveSchema = `
+CREATE VIRTUAL TABLE IF NOT EXISTS cue_window_fts USING fts5(text, tokenize='unicode61 remove_diacritics 2');
+CREATE TABLE IF NOT EXISTS media_catalog(
+ key TEXT NOT NULL, lang TEXT NOT NULL, state TEXT NOT NULL, checksum TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, PRIMARY KEY(key,lang)
+);
+
 -- Which documents embed which video. The link lives in the document markup, so
 -- without recording it the only way to answer "where is this video used" would be
 -- to re-parse every document in the library.
@@ -449,8 +454,7 @@ CREATE TRIGGER IF NOT EXISTS verse_ad AFTER DELETE ON verse BEGIN
 END;
 `
 
-const schema = verseSchema + `
-CREATE TABLE IF NOT EXISTS pub(
+const schema = verseSchema + `CREATE TABLE IF NOT EXISTS pub(
 	id INTEGER PRIMARY KEY,
 	key TEXT NOT NULL UNIQUE,          -- mwb_S_202609, nwtsty_S
 	symbol TEXT NOT NULL,              -- symbol for the API: mwb, w, nwtsty

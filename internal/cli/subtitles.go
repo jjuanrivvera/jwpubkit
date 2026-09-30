@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -67,7 +68,7 @@ The key can be pub-jwb-125_4_VIDEO, docid-702017141_1_VIDEO, a jw.org link
 			if err != nil {
 				return err
 			}
-			st, err := a.store()
+			st, err := a.commandStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -127,7 +128,7 @@ The key can be pub-jwb-125_4_VIDEO, docid-702017141_1_VIDEO, a jw.org link
 	}
 	cmd.Flags().StringVarP(&format, "format", "f", "txt", "txt, json or vtt")
 	cmd.Flags().BoolVar(&withTimes, "timings", false, "one line per cue, with its timestamp")
-	cmd.AddCommand(a.findCmd())
+	cmd.AddCommand(a.findCmd(), a.subtitlesSyncCmd())
 	return cmd
 }
 
@@ -151,6 +152,8 @@ func (a *app) recordCues(st *store.Store, key string, cues []subs.Cue) {
 func (a *app) findCmd() *cobra.Command {
 	var limit int
 	var allLangs bool
+	var scope string
+	var contextWindow time.Duration
 	cmd := &cobra.Command{
 		Use:     `find "<query>"`,
 		Aliases: []string{"search", "buscar"},
@@ -166,7 +169,13 @@ downloaded by this command.`,
   pubkit subtitles find "\"exact phrase\"" --limit 5`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			st, err := a.store()
+			if scope != "fetched" && scope != "catalog" {
+				return fmt.Errorf("scope must be fetched or catalog")
+			}
+			if contextWindow < 0 {
+				return fmt.Errorf("context must not be negative")
+			}
+			st, err := a.commandStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -174,7 +183,15 @@ downloaded by this command.`,
 			if allLangs {
 				lang = ""
 			}
-			hits, err := st.SearchCues(args[0], lang, limit)
+			var hits []store.CueHit
+			if scope == "catalog" {
+				if err := st.IndexCueWindows(); err != nil {
+					return err
+				}
+				hits, err = st.SearchCatalogCues(args[0], lang, limit)
+			} else {
+				hits, err = st.SearchCues(args[0], lang, limit)
+			}
 			if err != nil {
 				return err
 			}
@@ -185,11 +202,30 @@ downloaded by this command.`,
 				// UsedIn are the documents that embed this video, which is what
 				// turns "the phrase is at 1:04" into "and it belongs to this part
 				// of this article".
-				UsedIn []store.Edge `json:"used_in,omitempty"`
+				Context   []store.Cue  `json:"context,omitempty"`
+				Published string       `json:"published,omitempty"`
+				Category  string       `json:"category,omitempty"`
+				State     string       `json:"state"`
+				UsedIn    []store.Edge `json:"used_in,omitempty"`
 			}
 			out := make([]found, 0, len(hits))
 			for _, h := range hits {
 				f := found{CueHit: h, Timestamp: subs.FormatTS(h.Start), URL: subs.WatchURL(h.Key, h.Lang, h.Seconds)}
+
+				f.State = "indexed"
+				if contextWindow > 0 {
+					f.Context, err = st.CueContext(h.Key, h.Lang, h.Start-contextWindow, h.End+contextWindow)
+					if err != nil {
+						return err
+					}
+				}
+				if v, e := st.Video(h.Key, h.Lang); e == nil && v != nil {
+					var m cdn.MediaItem
+					if json.Unmarshal([]byte(v.JSON), &m) == nil {
+						f.Published = m.FirstPublished
+						f.Category = m.PrimaryCategory
+					}
+				}
 				if docs, err := st.VideoDocuments(h.Key, 3); err == nil {
 					f.UsedIn = docs
 				}
@@ -211,6 +247,9 @@ downloaded by this command.`,
 				a.printf("%-28s %7s  %s\n", h.Key, h.Timestamp, h.Title)
 				a.printf("%38s%s\n", "", h.Snippet)
 				a.printf("%38s%s\n", "", h.URL)
+				for _, c := range h.Context {
+					a.printf("[%s] %s\n", subs.FormatTS(c.Start), c.Text)
+				}
 				for _, d := range h.UsedIn {
 					a.printf("%38sused in %s  %s\n", "", d.Cite, d.Title)
 				}
@@ -218,6 +257,8 @@ downloaded by this command.`,
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&scope, "scope", "fetched", "fetched or catalog")
+	cmd.Flags().DurationVar(&contextWindow, "context", 0, "surrounding transcript window, e.g. 15s")
 	cmd.Flags().IntVar(&limit, "limit", 20, "maximum number of hits")
 	cmd.Flags().BoolVar(&allLangs, "all-languages", false, "search transcripts of every language, not just --language")
 	return cmd

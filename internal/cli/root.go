@@ -20,6 +20,7 @@ import (
 	"github.com/jjuanrivvera/jwpubkit/internal/cdn"
 	"github.com/jjuanrivvera/jwpubkit/internal/config"
 	"github.com/jjuanrivvera/jwpubkit/internal/content"
+	"github.com/jjuanrivvera/jwpubkit/internal/media"
 	"github.com/jjuanrivvera/jwpubkit/internal/store"
 )
 
@@ -39,11 +40,12 @@ type app struct {
 	lang    string
 	quiet   bool
 
-	st  *store.Store
-	cdn *cdn.Client
-	out io.Writer
-	err io.Writer
-	ctx context.Context
+	clipRun media.Run
+	st      *store.Store
+	cdn     *cdn.Client
+	out     io.Writer
+	err     io.Writer
+	ctx     context.Context
 }
 
 // Execute runs the CLI and returns the process exit code.
@@ -122,7 +124,7 @@ Library: ~/.local/share/jwlib (change it with --library, JWPUBKIT_HOME or JWLIB_
 	pf.BoolVar(&a.offline, "offline", false, "stay off the network (no sync, no CDN lookups)")
 	pf.StringVar(&a.lang, "language", a.settle("language", defaultLang, a.cfg.Language, "JWPUBKIT_LANG"), "publication language (jw.org symbol: E english, S spanish, F french…)")
 	pf.BoolVarP(&a.quiet, "quiet", "q", false, "do not print progress on stderr")
-	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.readingTimeCmd(), a.chainCmd(), a.graphCmd(), a.completionCmd(), a.versionCmd(), a.dailyCmd(), a.watchtowerCmd(), a.placesCmd(), a.updateWeekCmd())
+	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.readingTimeCmd(), a.chainCmd(), a.graphCmd(), a.completionCmd(), a.versionCmd(), a.dailyCmd(), a.watchtowerCmd(), a.placesCmd(), a.updateWeekCmd(), a.catalogCmd(), a.mediaCmd())
 	return root
 }
 

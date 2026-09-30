@@ -23,32 +23,35 @@ import (
 )
 
 type imgCandidate struct {
-	Source string `json:"source"`
-	URL    string `json:"url,omitempty"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
-	Bytes  int    `json:"bytes"`
-	data   []byte
+	Dependencies []string `json:"dependencies,omitempty"`
+	Source       string   `json:"source"`
+	URL          string   `json:"url,omitempty"`
+	Width        int      `json:"width"`
+	Height       int      `json:"height"`
+	Bytes        int      `json:"bytes"`
+	data         []byte
 }
 
 type imgOut struct {
-	File       string         `json:"file"`
-	Alt        string         `json:"alt,omitempty"`
-	Caption    string         `json:"caption,omitempty"`
-	Credit     string         `json:"credit,omitempty"`
-	Width      int            `json:"width"`
-	Height     int            `json:"height"`
-	Bytes      int            `json:"bytes"`
-	Source     string         `json:"source"`
-	URL        string         `json:"url,omitempty"`
-	SHA256     string         `json:"sha256"`
-	Saved      string         `json:"saved,omitempty"`
-	Media      string         `json:"media,omitempty"`
-	Candidates []imgCandidate `json:"candidates"`
+	Provenance imageProvenance `json:"provenance"`
+	File       string          `json:"file"`
+	Alt        string          `json:"alt,omitempty"`
+	Caption    string          `json:"caption,omitempty"`
+	Credit     string          `json:"credit,omitempty"`
+	Width      int             `json:"width"`
+	Height     int             `json:"height"`
+	Bytes      int             `json:"bytes"`
+	Source     string          `json:"source"`
+	URL        string          `json:"url,omitempty"`
+	SHA256     string          `json:"sha256"`
+	Saved      string          `json:"saved,omitempty"`
+	Media      string          `json:"media,omitempty"`
+	Candidates []imgCandidate  `json:"candidates"`
 }
 
 func (a *app) imageCmd() *cobra.Command {
 	var outDir, mediaDir string
+	var paragraph, passage, figure, genre string
 	var mediaStore, listOnly bool
 	cmd := &cobra.Command{
 		Use:     "image <docid>",
@@ -69,7 +72,7 @@ keeps the one with the most pixels and, on a tie, the one with more bytes.
 			if err != nil {
 				return fmt.Errorf("invalid docid %q", args[0])
 			}
-			st, err := a.store()
+			st, err := a.commandStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -82,12 +85,20 @@ keeps the one with the most pixels and, on a tie, the one with more bytes.
 			}
 			local := a.localPubsFor(st, docid)
 			var results []imgOut
-			for _, img := range parsed.Images {
+			images, provenance, err := imageSelection(st, docid, parsed, paragraph, passage, figure, genre)
+			if err != nil {
+				return err
+			}
+			for _, img := range images {
 				if img.File == "" {
 					continue
 				}
-				res := imgOut{File: img.File, Alt: img.Alt, Caption: img.Caption, Credit: img.Credit}
-				cands := a.imageCandidates(img.File, local)
+				res := imgOut{Provenance: provenance[img.File], File: img.File, Alt: img.Alt, Caption: img.Caption, Credit: img.Credit}
+				candidateApp := *a
+				if listOnly {
+					candidateApp.offline = true
+				}
+				cands := candidateApp.imageCandidates(img.File, local)
 				if len(cands) == 0 {
 					res.Source = "unavailable"
 					results = append(results, res)
@@ -165,6 +176,10 @@ keeps the one with the most pixels and, on a tie, the one with more bytes.
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&paragraph, "paragraph", "", "publication paragraph number or range (N-M)")
+	cmd.Flags().StringVar(&passage, "passage", "", "only figures spanning paragraphs citing this Bible passage")
+	cmd.Flags().StringVar(&figure, "figure", "", "select this exact figure filename")
+	cmd.Flags().StringVar(&genre, "genre", "", "svg or photo")
 	cmd.Flags().StringVarP(&outDir, "output", "o", "", "directory to write the images to (default: the current one)")
 	cmd.Flags().BoolVar(&mediaStore, "media-store", false, "also write to <media-dir>/<xx>/<sha256>.<ext>")
 	cmd.Flags().StringVar(&mediaDir, "media-dir", "", "content-addressed media store (default: <library>/media, or JWPUBKIT_MEDIA_DIR)")
@@ -199,7 +214,17 @@ func (a *app) imageCandidates(file string, localPubs []string) []imgCandidate {
 			continue
 		}
 		if data, err := jf.ReadFile(file); err == nil {
-			c := imgCandidate{Source: "jwpub", Bytes: len(data), data: data}
+			var dependencies []string
+			if strings.EqualFold(path.Ext(file), ".svg") {
+				var err error
+				data, dependencies, err = inlineSVG(data, file, jf)
+				if err != nil {
+					a.logf("%s: %v", file, err)
+					jf.Close()
+					continue
+				}
+			}
+			c := imgCandidate{Source: "jwpub", Bytes: len(data), data: data, Dependencies: dependencies}
 			c.Width, c.Height = dims(data)
 			cands = append(cands, c)
 		}
@@ -208,7 +233,7 @@ func (a *app) imageCandidates(file string, localPubs []string) []imgCandidate {
 			break
 		}
 	}
-	if a.offline {
+	if a.offline || strings.EqualFold(path.Ext(file), ".svg") {
 		return cands
 	}
 	for _, u := range cdnImageURLs(file, a.lang) {
@@ -259,7 +284,7 @@ func leadingDigits(s string) string {
 func dims(data []byte) (int, int) {
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
-		return 0, 0
+		return svgDims(data)
 	}
 	return cfg.Width, cfg.Height
 }
