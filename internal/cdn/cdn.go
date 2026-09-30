@@ -43,8 +43,9 @@ type Client struct {
 
 	// PubMediaURL and MediatorURL are the endpoints to ask. New fills them
 	// with the real ones; a caller overrides them to aim somewhere else.
-	PubMediaURL string
-	MediatorURL string
+	PubMediaURL   string
+	MediatorURL   string
+	CategoriesURL string
 }
 
 // New returns a client for language lang ("E").
@@ -261,18 +262,26 @@ func FileMD5(path string) (string, error) {
 
 // MediaFile is one rendition of a video in the mediator answer.
 type MediaFile struct {
+	Checksum               string  `json:"checksum"`
+	MimeType               string  `json:"mimetype"`
+	Width                  int     `json:"width"`
+	Height                 int     `json:"height"`
 	Label                  string  `json:"label"`
 	ProgressiveDownloadURL string  `json:"progressiveDownloadURL"`
 	Filesize               int64   `json:"filesize"`
 	Duration               float64 `json:"duration"`
 	Subtitled              bool    `json:"subtitled"`
 	Subtitles              *struct {
-		URL string `json:"url"`
+		URL              string `json:"url"`
+		Checksum         string `json:"checksum"`
+		ModifiedDatetime string `json:"modifiedDatetime"`
 	} `json:"subtitles"`
 }
 
 // MediaItem is a video (or audio) in the mediator catalog.
 type MediaItem struct {
+	Type                       string      `json:"type"`
+	FoundIn                    []string    `json:"found_in,omitempty"`
 	GUID                       string      `json:"guid"`
 	LanguageAgnosticNaturalKey string      `json:"languageAgnosticNaturalKey"`
 	NaturalKey                 string      `json:"naturalKey"`

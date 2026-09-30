@@ -239,7 +239,7 @@ func TestRemainingDateAndChapterValidation(t *testing.T) {
 			}
 		}
 	}
-	for _, ref := range []string{"Gen 1-2", "Gen 1:2", "Gen 1; 2", "bogus"} {
+	for _, ref := range []string{"bogus", "Gen 1:99"} {
 		_, err := runRemaining(t, t.TempDir(), nil, "places", ref)
 		if err == nil {
 			t.Fatalf("accepted %q", ref)

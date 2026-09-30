@@ -18,11 +18,13 @@ type placesOut struct {
 }
 
 func (a *app) placesCmd() *cobra.Command {
-	return &cobra.Command{
-		Use: "places <chapter-reference>", Aliases: []string{"lugares"},
+	var kind, figure string
+	cmd := &cobra.Command{
+		Use: "places <passage>", Aliases: []string{"lugares"},
 		Short: "Chapter note terms, citing atlas maps and Bible appendix figures",
-		Long: `Reports note terms with encyclopedia articles (a heuristic, not a classification
-of places), atlas documents citing the chapter, and library-wide study Bible
+		Long: `Accepts chapter and verse ranges, and classifies evidence by source.
+Encyclopedia terms remain unclassified unless publication-title evidence exists.
+Reports note terms with encyclopedia articles, atlas documents citing the chapter, and library-wide study Bible
 appendix figures with their list-item labels. No source links a place name to a
 position on a map. Reads only the library; nothing is synced.`,
 		Args: cobra.ExactArgs(1),
@@ -35,21 +37,64 @@ position on a map. Reads only the library; nothing is synced.`,
 			if err != nil {
 				return err
 			}
-			if len(rs) != 1 || rs[0].StartChapter != rs[0].EndChapter {
-				return fmt.Errorf("places takes one whole chapter reference")
+
+			out := &placesOut{Reference: bible.FormatList(rs), Sources: []store.PlaceSource{}, Notes: []string{}}
+			seen := map[string]bool{}
+			for _, r := range rs {
+				part, err := a.chapterPlaces(st, r)
+				if err != nil {
+					return err
+				}
+				if len(out.Notes) == 0 {
+					out.Notes = part.Notes
+				}
+				for _, row := range part.Sources {
+					key := fmt.Sprintf("%s:%s:%d", row.Kind, row.Key, row.DocID)
+					if seen[key] {
+						continue
+					}
+					seen[key] = true
+					switch row.Kind {
+					case "atlas_map":
+						row.Classification = "map"
+						row.ClassificationBasis = "atlas publication and overlapping Bible citation"
+					case "appendix_figure":
+						row.Classification = "appendix_figure"
+						row.ClassificationBasis = "Bible appendix document class and SVG multimedia"
+					default:
+						row.Classification = "unclassified"
+						row.ClassificationBasis = "exact-title encyclopedia match is not sufficient to identify a place"
+						pubs, err := st.Pubs()
+						if err != nil {
+							return err
+						}
+						for _, pub := range pubs {
+							if len([]rune(row.Title)) > 3 && strings.Contains(strings.ToLower(pub.Title), strings.ToLower(row.Title)) {
+								row.Classification = "publication_title"
+								row.ClassificationBasis = "term also occurs in an indexed publication title"
+								break
+							}
+						}
+					}
+					if kind != "" && row.Classification != kind {
+						continue
+					}
+					if figure != "" {
+						images := []store.PlaceFigure{}
+						for _, img := range row.Images {
+							if img.File == figure {
+								images = append(images, img)
+							}
+						}
+						if len(images) == 0 {
+							continue
+						}
+						row.Images = images
+					}
+					out.Sources = append(out.Sources, row)
+				}
 			}
-			r := rs[0]
-			first := 1
-			if bible.HasSuperscription(r.Book, r.StartChapter) {
-				first = 0
-			}
-			if r.StartVerse != first || r.EndVerse != bible.VerseCount(r.Book, r.StartChapter) {
-				return fmt.Errorf("places takes one whole chapter reference")
-			}
-			out, err := a.chapterPlaces(st, r)
-			if err != nil {
-				return err
-			}
+
 			if a.jsonOut {
 				return a.printJSON(out)
 			}
@@ -69,6 +114,9 @@ position on a map. Reads only the library; nothing is synced.`,
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&kind, "kind", "", "classification filter: map, appendix_figure, publication_title or unclassified")
+	cmd.Flags().StringVar(&figure, "figure", "", "select an exact appendix or atlas figure filename")
+	return cmd
 }
 
 func (a *app) chapterPlaces(st *store.Store, r bible.Range) (*placesOut, error) {

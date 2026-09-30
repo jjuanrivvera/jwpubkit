@@ -3,6 +3,9 @@ package cli
 import (
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/jjuanrivvera/jwpubkit/internal/cdn"
 
 	"github.com/spf13/cobra"
 
@@ -11,7 +14,9 @@ import (
 
 func (a *app) syncCmd() *cobra.Command {
 	var issue, file string
-	var force bool
+	var force, plan bool
+	var interval time.Duration
+	var budget int64
 	cmd := &cobra.Command{
 		Use:   "sync <symbol>...",
 		Short: "Download (cached, checksum-verified), decrypt and index publications",
@@ -31,7 +36,21 @@ Publications are fetched in the language given by --language (default E).`,
   pubkit sync --file ~/Downloads/mwb_E_202609.jwpub mwb --issue 202609`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			st, err := a.store()
+			a.ctx = cmd.Context()
+			if interval < 0 || budget < 0 {
+				return fmt.Errorf("interval and budget must not be negative")
+			}
+			if plan {
+				if file != "" {
+					return fmt.Errorf("--plan cannot be combined with --file")
+				}
+				rows, err := a.planSync(args, issue, force, interval)
+				if err != nil {
+					return err
+				}
+				return a.printSyncPlan(rows)
+			}
+			st, err := a.commandStore(cmd)
 			if err != nil {
 				return err
 			}
@@ -51,7 +70,27 @@ Publications are fetched in the language given by --language (default E).`,
 			}
 			var results []*store.SyncResult
 			var failed []string
-			for _, sym := range args {
+			used := int64(0)
+			pending := []string{}
+			for i, sym := range args {
+				if i > 0 {
+					if err := cdn.Pause(cmd.Context(), interval); err != nil {
+						return err
+					}
+				}
+				if budget > 0 {
+					rows, err := a.planSync([]string{sym}, issue, force, 0)
+					if err != nil {
+						return err
+					}
+					if rows[0].DownloadBytes > budget-used {
+						pending = append(pending, sym)
+						continue
+					}
+					if err := cdn.Pause(cmd.Context(), interval); err != nil {
+						return err
+					}
+				}
 				res, err := a.syncOne(strings.TrimSpace(sym), issue, force)
 				if err != nil {
 					failed = append(failed, fmt.Sprintf("%s: %v", sym, err))
@@ -59,6 +98,9 @@ Publications are fetched in the language given by --language (default E).`,
 						fmt.Fprintf(a.err, "✗ %s: %v\n", sym, err)
 					}
 					continue
+				}
+				if res.Downloaded {
+					used += res.Size
 				}
 				results = append(results, res)
 				if a.jsonOut {
@@ -76,9 +118,12 @@ Publications are fetched in the language given by --language (default E).`,
 				}
 			}
 			if a.jsonOut {
-				if err := a.printJSON(map[string]any{"synced": results, "errors": failed}); err != nil {
+				if err := a.printJSON(map[string]any{"synced": results, "errors": failed, "pending": pending, "download_bytes": used}); err != nil {
 					return err
 				}
+			}
+			if len(pending) > 0 {
+				return fmt.Errorf("%d publications pending: byte budget exhausted (%s)", len(pending), strings.Join(pending, ", "))
 			}
 			if len(failed) > 0 {
 				return fmt.Errorf("%d of %d publications failed", len(failed), len(args))
@@ -86,6 +131,9 @@ Publications are fetched in the language given by --language (default E).`,
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&plan, "plan", false, "show checksums, download bytes and disk estimate without writes")
+	cmd.Flags().Int64Var(&budget, "budget-bytes", 0, "maximum planned publication download bytes (0: unlimited)")
+	cmd.Flags().DurationVar(&interval, "interval", 2*time.Second, "pause between publication requests")
 	cmd.Flags().StringVar(&issue, "issue", "", "issue of a periodical: YYYYMM (or YYYYMMDD before 2016)")
 	cmd.Flags().BoolVar(&force, "force", false, "download and index even when the local copy is up to date")
 	cmd.Flags().StringVar(&file, "file", "", "index a local .jwpub instead of downloading it")
