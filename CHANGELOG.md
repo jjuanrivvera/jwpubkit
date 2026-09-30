@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.1 - 2026-09-30
+
+- Resolve historical public Watchtower references from 2008–2015 under the wp API symbol,
+  even when their JWPUB reference metadata still uses w. Study and earlier issues keep w.
+- Raise the local and CI coverage floor to 65%, backed by the synthetic test suite.
+
 ## v0.10.0 - 2026-09-30
 
 - Discover audiovisual metadata by traversing all mediator categories, deduplicating keys

@@ -248,7 +248,9 @@ a map, because no such link exists in the data; see DECISIONS.md. Classification
 maps, general appendix figures, publication-title candidates and unclassified encyclopedia
 terms. It does not infer geography from capitalized words. `--kind` filters classification;
 `--figure` selects an exact figure filename. `update-week --with-references` resolves missing
-publications named by the workbook's extracts; unresolved metadata and failures are reported.
+publications named by the workbook's extracts; historical public editions from 2008–2015
+use the `wp` API symbol even when their reference metadata uses `w`. Unresolved metadata
+and failures are reported.
 
 ### `graph`
 

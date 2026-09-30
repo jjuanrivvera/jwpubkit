@@ -23,6 +23,11 @@ func referencePublication(e store.Extract) (string, string) {
 	if e.RefIssue != 0 {
 		issue = store.NormalizeIssue(strconv.Itoa(e.RefIssue))
 	}
+	// Public editions kept the w symbol in reference tables after the two editions
+	// separated; their downloadable JWPUB lives under wp instead.
+	if symbol == "w" && e.RefIssue >= 20080101 && e.RefIssue <= 20151231 && strings.HasSuffix(issue, "01") {
+		symbol = "wp"
+	}
 	return symbol, issue
 }
 func (a *app) updateReferences(st *store.Store, monday time.Time, dryRun bool, interval time.Duration, out *weekUpdateOut) error {

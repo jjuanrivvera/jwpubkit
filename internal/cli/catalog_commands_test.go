@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -226,6 +228,42 @@ func TestWeekReferencesDryRunAndSync(t *testing.T) {
 	if err != nil || !strings.Contains(data, "publication_reference") {
 		t.Fatalf("%s %v", data, err)
 	}
+	// Reference metadata uses the old undated symbol; the download API needs wp.
+	if _, err := st.DB.ExecContext(t.Context(), `UPDATE extract SET ref_symbol='w12',ref_undated='w',ref_issue_tag=20120501 WHERE docid=87001`); err != nil {
+		t.Fatal(err)
+	}
+	file := testutil.Build(t, t.TempDir(), testutil.Pub{Symbol: "wp12", Undated: "wp", Year: 2012, IssueTag: 20120501, Title: "Invented public gear review", Docs: []testutil.Doc{{ID: 1, MepsID: 87002, Class: 40, Title: "Invented missing gears", HTML: `<p data-pid="1">A purple toy gear hums.</p>`}}})
+	payload, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checksum := md5.Sum(payload)
+	available := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/invented.jwpub" {
+			_, _ = w.Write(payload)
+			return
+		}
+		if r.URL.Query().Get("pub") != "wp" || r.URL.Query().Get("issue") != "20120501" {
+			t.Errorf("wrong historical selector: %s", r.URL)
+		}
+		entry := cdn.PubFile{Filesize: int64(len(payload))}
+		entry.File.URL = "http://" + r.Host + "/invented.jwpub"
+		entry.File.Checksum = hex.EncodeToString(checksum[:])
+		response := cdn.PubMedia{PubName: "Invented public gear review", Files: map[string]map[string][]cdn.PubFile{"E": {"JWPUB": {entry}}}}
+		_ = json.NewEncoder(w).Encode(response)
+	}))
+	defer available.Close()
+	app.cdn = cdn.New("E")
+	app.cdn.HTTP = available.Client()
+	app.cdn.PubMediaURL = available.URL
+	out = &weekUpdateOut{}
+	if err := app.updateReferences(st, day, false, 0, out); err != nil || len(out.Rows) != 1 || out.Rows[0].Symbol != "wp" || out.Rows[0].Status != "synced" {
+		t.Fatalf("%+v %v", out, err)
+	}
+	if _, err := st.Doc(87002); err != nil {
+		t.Fatal(err)
+	}
+
 }
 func TestPubMediaSubtitleFallback(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -278,6 +316,18 @@ func TestMediaClipCommand(t *testing.T) {
 		}
 		if !test.wantErr && !strings.Contains(output.String(), `"duration_seconds": 20`) {
 			t.Fatal(output.String())
+		}
+	}
+}
+
+func TestHistoricalPublicReferenceSymbol(t *testing.T) {
+	for _, test := range []struct {
+		issue int
+		want  string
+	}{{20120501, "wp"}, {20120515, "w"}, {20020601, "w"}, {20260100, "w"}} {
+		symbol, issue := referencePublication(store.Extract{RefSymbol: "w12", RefUndated: "w", RefIssue: test.issue})
+		if symbol != test.want || issue == "" {
+			t.Fatalf("issue %d: %s %s", test.issue, symbol, issue)
 		}
 	}
 }
