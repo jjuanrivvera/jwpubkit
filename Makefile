@@ -5,7 +5,7 @@ LDFLAGS := -s -w -X $(MODULE)/internal/cli.Version=$(VERSION)
 PREFIX ?= $(HOME)/.local/bin
 # The coverage floor; the same number as .github/workflows/ci.yml. It sits under the
 # measured total on purpose: that total drifts about a point between machines.
-COVER_MIN ?= 58
+COVER_MIN ?= 60
 
 .PHONY: build install test lint security verify cover-check clean
 
