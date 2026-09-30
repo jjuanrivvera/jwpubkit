@@ -85,7 +85,7 @@ func (s *Store) Define(term string) (GlossaryEntry, bool) {
 		return GlossaryEntry{}, false
 	}
 	var e GlossaryEntry
-	err := s.DB.QueryRow(`SELECT term, text, docid, pid FROM glossary WHERE key=? LIMIT 1`, key).
+	err := s.queryRow(`SELECT term, text, docid, pid FROM glossary WHERE key=? LIMIT 1`, key).
 		Scan(&e.Term, &e.Text, &e.DocID, &e.PID)
 	if err != nil {
 		return GlossaryEntry{}, false

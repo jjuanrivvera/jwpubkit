@@ -76,7 +76,7 @@ func (s *Store) Sync(ctx context.Context, c *cdn.Client, symbol, issue string, f
 	}
 
 	var dbMD5 string
-	err = s.DB.QueryRow(`SELECT md5 FROM pub WHERE key=?`, info.Key()).Scan(&dbMD5)
+	err = s.DB.QueryRowContext(ctx, `SELECT md5 FROM pub WHERE key=?`, info.Key()).Scan(&dbMD5)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}

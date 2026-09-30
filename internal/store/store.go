@@ -4,6 +4,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -20,7 +21,8 @@ const SchemaVersion = "3"
 
 // Store is an open library.
 type Store struct {
-	DB *sql.DB
+	DB  *sql.DB
+	ctx context.Context
 	// Dir is the library directory, shared by every language.
 	Dir string
 	// Lang is the language this handle holds; Path is the file it holds it in.

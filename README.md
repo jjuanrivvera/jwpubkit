@@ -170,6 +170,18 @@ What the library currently holds:
 pubkit pubs --json
 ```
 
+### `daily`, `watchtower`, `places`, `update-week`
+
+```sh
+pubkit daily                      # the daily text, from the yearly volume
+pubkit watchtower 2026-09-28      # the study article, paragraph by paragraph with its question
+pubkit places "Jer 38"            # the terms, atlas maps and appendix figures of a chapter
+pubkit update-week --dry-run      # what the week needs, without touching the network
+```
+
+`places` reports what each row is and where it came from. It does not say a place is located on
+a map, because no such link exists in the data — see DECISIONS.md.
+
 ### `graph`
 
 Walk the connections the publications already state, from a passage or a document — who quotes

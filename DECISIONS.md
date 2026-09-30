@@ -66,6 +66,16 @@ The lookup itself should move to the encyclopedia's own topic table (6 444 alias
 present in every language it is published in) rather than exact title matching. That is a
 separate, additive piece of work.
 
+## A yearly volume is found by its family, not by its symbol
+
+A volume carries the year in its own symbol — `es26`, `mwb26` — and the family (`es`, `mwb`) is
+recorded separately in `undated_symbol`. A caller knows the family. Looking a date up by symbol
+alone therefore found nothing while the library held 365 dated rows for that very volume, and the
+error message then offered `pubkit sync es --issue 2026`, which the CDN answers with a 400.
+
+Both were wrong in the same place: the family is the handle, and the yearly symbol is what the
+publication happens to call itself. There is a test for each half.
+
 ## A question is evidence, not a requirement
 
 The all-words search returned nothing for five of six questions someone actually asked while

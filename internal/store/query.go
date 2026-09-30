@@ -59,7 +59,7 @@ func (s *Store) Pubs() ([]Pub, error) {
 // PubByKey finds a publication by library key.
 func (s *Store) PubByKey(key string) (*Pub, error) {
 	var p Pub
-	err := scanPub(s.DB.QueryRow(`SELECT `+pubCols+` FROM pub p WHERE p.key=?`, key), &p)
+	err := scanPub(s.queryRow(`SELECT `+pubCols+` FROM pub p WHERE p.key=?`, key), &p)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -69,7 +69,7 @@ func (s *Store) PubByKey(key string) (*Pub, error) {
 // HasSymbol reports whether any publication with that API symbol is synced.
 func (s *Store) HasSymbol(symbol string) bool {
 	var n int
-	s.DB.QueryRow(`SELECT count(*) FROM pub WHERE symbol=?`, symbol).Scan(&n)
+	s.queryRow(`SELECT count(*) FROM pub WHERE symbol=?`, symbol).Scan(&n)
 	return n > 0
 }
 
@@ -93,7 +93,7 @@ type Doc struct {
 // It returns false when the document is not in the library.
 func (s *Store) ChapterNumber(docid int) (int, bool) {
 	var n sql.NullInt64
-	if err := s.DB.QueryRow(`SELECT chapter FROM doc WHERE docid=?`, docid).Scan(&n); err != nil {
+	if err := s.queryRow(`SELECT chapter FROM doc WHERE docid=?`, docid).Scan(&n); err != nil {
 		return 0, false
 	}
 	return int(n.Int64), n.Valid
@@ -107,7 +107,7 @@ func (s *Store) Doc(docid int) (*Doc, error) {
 	var d Doc
 	var class, first, last sql.NullInt64
 	var p Pub
-	row := s.DB.QueryRow(`SELECT d.docid, d.class, COALESCE(d.title,''), COALESCE(d.toc_title,''), COALESCE(d.context_title,''),
+	row := s.queryRow(`SELECT d.docid, d.class, COALESCE(d.title,''), COALESCE(d.toc_title,''), COALESCE(d.context_title,''),
 		COALESCE(d.feature_title,''), d.first_page, d.last_page, d.html, `+pubCols+`
 		FROM doc d JOIN pub p ON p.id = d.pub_id WHERE d.docid=?`, docid)
 	err := row.Scan(&d.DocID, &class, &d.Title, &d.TocTitle, &d.ContextTitle, &d.FeatureTitle, &first, &last, &d.HTML,
@@ -400,7 +400,7 @@ func (s *Store) BibleID() int64 {
 	// publication multiplies 31 000 verses by 3 500 notes before grouping, which
 	// turned a startup question into a minutes-long one.
 	var id int64
-	err := s.DB.QueryRow(`SELECT pub_id,
+	err := s.queryRow(`SELECT pub_id,
 			(SELECT count(*) FROM verse_note n WHERE n.pub_id = v.pub_id) AS notes,
 			count(*) AS verses
 		FROM verse v GROUP BY pub_id ORDER BY notes DESC, verses DESC LIMIT 1`).Scan(&id, new(int), new(int))
@@ -423,7 +423,7 @@ func (s *Store) BibleTitle() string {
 // Verses loads verses first..last (BibleVerseId) with footnotes, marginal
 // references and study notes.
 func (s *Store) Verses(first, last int) ([]Verse, error) {
-	rows, err := s.DB.Query(`SELECT id, book, chapter, verse, text FROM verse
+	rows, err := s.query(`SELECT id, book, chapter, verse, text FROM verse
 		WHERE id BETWEEN ? AND ? AND pub_id = ? ORDER BY id`, first, last, s.BibleID())
 	if err != nil {
 		return nil, err
@@ -444,7 +444,7 @@ func (s *Store) Verses(first, last int) ([]Verse, error) {
 		return nil, nil
 	}
 
-	frows, err := s.DB.Query(`SELECT verse_id, COALESCE(marker,''), COALESCE(anchor,''), text FROM verse_fn WHERE verse_id BETWEEN ? AND ? ORDER BY verse_id, fnid`, first, last)
+	frows, err := s.query(`SELECT verse_id, COALESCE(marker,''), COALESCE(anchor,''), text FROM verse_fn WHERE verse_id BETWEEN ? AND ? ORDER BY verse_id, fnid`, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +461,7 @@ func (s *Store) Verses(first, last int) ([]Verse, error) {
 	}
 	frows.Close()
 
-	xrows, err := s.DB.Query(`SELECT verse_id, mid, COALESCE(marker,''), COALESCE(anchor,''), first, last FROM verse_xref
+	xrows, err := s.query(`SELECT verse_id, mid, COALESCE(marker,''), COALESCE(anchor,''), first, last FROM verse_xref
 		WHERE verse_id BETWEEN ? AND ? ORDER BY verse_id, mid, seq`, first, last)
 	if err != nil {
 		return nil, err
@@ -488,7 +488,7 @@ func (s *Store) Verses(first, last int) ([]Verse, error) {
 	}
 	xrows.Close()
 
-	nrows, err := s.DB.Query(`SELECT verse_id, COALESCE(label,''), text, COALESCE(docid,0), COALESCE(html,'') FROM verse_note WHERE verse_id BETWEEN ? AND ? ORDER BY verse_id, seq`, first, last)
+	nrows, err := s.query(`SELECT verse_id, COALESCE(label,''), text, COALESCE(docid,0), COALESCE(html,'') FROM verse_note WHERE verse_id BETWEEN ? AND ? ORDER BY verse_id, seq`, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +606,7 @@ func (s *Store) ParagraphText(docid, pid int) (string, error) {
 // Perspicacia.
 func (s *Store) DocByTitle(pubSymbol, title string) (*DocSummary, error) {
 	var d DocSummary
-	err := s.DB.QueryRow(`SELECT d.docid, COALESCE(p.meps_symbol, p.symbol), COALESCE(d.title,'')
+	err := s.queryRow(`SELECT d.docid, COALESCE(p.meps_symbol, p.symbol), COALESCE(d.title,'')
 		FROM doc d JOIN pub p ON p.id = d.pub_id
 		WHERE (p.symbol=?1 OR p.meps_symbol=?1 OR p.undated_symbol=?1) AND lower(trim(d.title)) = lower(trim(?2))
 		LIMIT 1`, pubSymbol, title).Scan(&d.DocID, &d.Pub, &d.Title)
@@ -647,7 +647,7 @@ type Media struct {
 
 // MediaOf lists the multimedia of a document.
 func (s *Store) MediaOf(docid int) ([]Media, error) {
-	rows, err := s.DB.Query(`SELECT m.docid, COALESCE(m.begin_pid,0), COALESCE(m.end_pid,0), COALESCE(m.data_type,0), COALESCE(m.mime,''),
+	rows, err := s.query(`SELECT m.docid, COALESCE(m.begin_pid,0), COALESCE(m.end_pid,0), COALESCE(m.data_type,0), COALESCE(m.mime,''),
 		COALESCE(m.width,0), COALESCE(m.height,0), COALESCE(m.label,''), COALESCE(m.caption,''), COALESCE(m.category,0),
 		COALESCE(m.file,''), COALESCE(m.key_symbol,''), COALESCE(m.track,0), COALESCE(m.meps_docid,0), COALESCE(m.issue_tag,0), COALESCE(p.file,'')
 		FROM media m JOIN pub p ON p.id = m.pub_id WHERE m.docid=? ORDER BY m.begin_pid, m.mm_id`, docid)
@@ -707,7 +707,7 @@ func scanExtracts(rows *sql.Rows) ([]Extract, error) {
 
 // ExtractsOf lists the extracts a document carries, in reading order.
 func (s *Store) ExtractsOf(docid int) ([]Extract, error) {
-	rows, err := s.DB.Query(`SELECT `+extractCols+` FROM extract e JOIN pub p ON p.id = e.pub_id WHERE e.docid=? ORDER BY e.sort`, docid)
+	rows, err := s.query(`SELECT `+extractCols+` FROM extract e JOIN pub p ON p.id = e.pub_id WHERE e.docid=? ORDER BY e.sort`, docid)
 	if err != nil {
 		return nil, err
 	}
@@ -726,10 +726,17 @@ func (s *Store) ExtractsFor(refDocID int) ([]Extract, error) {
 
 // DatedDocs returns the documents of publications with API symbol whose
 // DatedText covers date (YYYYMMDD), with the dated link.
+// DatedDocs finds the documents of a publication that cover a date.
+//
+// The symbol given is the family ("es", "mwb"), because that is what a caller
+// knows; a yearly volume carries the year in its own symbol ("es26"), and the
+// family is in undated_symbol. Matching only the symbol made a synced volume
+// invisible — the library had 365 dated rows for it and the lookup found none.
 func (s *Store) DatedDocs(symbol string, date int) ([]DatedDoc, error) {
-	rows, err := s.DB.Query(`SELECT dated.docid, dated.first, dated.last, COALESCE(dated.link,''), COALESCE(dated.caption,''), pub.key
+	rows, err := s.query(`SELECT dated.docid, dated.first, dated.last, COALESCE(dated.link,''), COALESCE(dated.caption,''), pub.key
 		FROM dated JOIN pub ON pub.id = dated.pub_id
-		WHERE pub.symbol = ? AND dated.first <= ? AND dated.last >= ? ORDER BY pub.issue DESC`, symbol, date, date)
+		WHERE (pub.symbol = ? OR pub.undated_symbol = ?)
+			AND dated.first <= ? AND dated.last >= ? ORDER BY pub.issue DESC`, symbol, symbol, date, date)
 	if err != nil {
 		return nil, err
 	}
@@ -758,7 +765,7 @@ type DatedDoc struct {
 // StudyArticles lists the Watchtower study articles (class 40) of a
 // publication in their order; M³ maps weeks to them by position.
 func (s *Store) StudyArticles(pubKey string) ([]int, error) {
-	rows, err := s.DB.Query(`SELECT d.docid FROM doc d JOIN pub p ON p.id = d.pub_id WHERE p.key=? AND d.class=40 ORDER BY d.local_id`, pubKey)
+	rows, err := s.query(`SELECT d.docid FROM doc d JOIN pub p ON p.id = d.pub_id WHERE p.key=? AND d.class=40 ORDER BY d.local_id`, pubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -777,7 +784,7 @@ func (s *Store) StudyArticles(pubKey string) ([]int, error) {
 // DatedRank is the position of a DatedText date inside its publication.
 func (s *Store) DatedRank(pubKey string, first int) (int, error) {
 	var n int
-	err := s.DB.QueryRow(`SELECT count(*) FROM dated JOIN pub ON pub.id = dated.pub_id WHERE pub.key=? AND dated.first < ?`, pubKey, first).Scan(&n)
+	err := s.queryRow(`SELECT count(*) FROM dated JOIN pub ON pub.id = dated.pub_id WHERE pub.key=? AND dated.first < ?`, pubKey, first).Scan(&n)
 	return n, err
 }
 
@@ -793,7 +800,7 @@ type CachedVideo struct {
 // Video returns a cached mediator item.
 func (s *Store) Video(key, lang string) (*CachedVideo, error) {
 	var v CachedVideo
-	err := s.DB.QueryRow(`SELECT key, COALESCE(title,''), COALESCE(duration,0), COALESCE(subtitles,''), COALESCE(json,'') FROM video WHERE key=? AND lang=?`, key, lang).
+	err := s.queryRow(`SELECT key, COALESCE(title,''), COALESCE(duration,0), COALESCE(subtitles,''), COALESCE(json,'') FROM video WHERE key=? AND lang=?`, key, lang).
 		Scan(&v.Key, &v.Title, &v.Duration, &v.Subtitles, &v.JSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -804,7 +811,7 @@ func (s *Store) Video(key, lang string) (*CachedVideo, error) {
 // PutVideo caches a mediator item.
 func (s *Store) PutVideo(key, lang, title string, duration float64, subtitles string, raw any) error {
 	b, _ := json.Marshal(raw)
-	_, err := s.DB.Exec(`INSERT OR REPLACE INTO video(key, lang, title, duration, subtitles, json, fetched_at) VALUES(?,?,?,?,?,?,?)`,
+	_, err := s.exec(`INSERT OR REPLACE INTO video(key, lang, title, duration, subtitles, json, fetched_at) VALUES(?,?,?,?,?,?,?)`,
 		key, lang, title, duration, subtitles, string(b), time.Now().Format(time.RFC3339))
 	return err
 }

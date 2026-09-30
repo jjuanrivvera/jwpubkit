@@ -22,7 +22,7 @@ type Cue struct {
 // PutCues records a video's transcript so it can be searched later. The whole
 // transcript is replaced, because a re-fetch is the only reason to write it.
 func (s *Store) PutCues(key, lang string, starts, ends []time.Duration, texts []string) error {
-	tx, err := s.DB.Begin()
+	tx, err := s.begin()
 	if err != nil {
 		return err
 	}
