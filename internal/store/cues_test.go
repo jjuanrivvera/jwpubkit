@@ -120,3 +120,75 @@ func TestDefinitionsComeFromLinksNotProse(t *testing.T) {
 		t.Error("no html, no definitions")
 	}
 }
+
+// CuesOf is the whole transcript, in the order it is spoken: the reading view of
+// what SearchCues indexes. The order comes from seq, never from insertion.
+func TestCuesOfReadsTheWholeTranscriptInOrder(t *testing.T) {
+	s, err := Open(t.TempDir(), "E")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	starts := []time.Duration{0, 5 * time.Second, 12 * time.Second}
+	ends := []time.Duration{4 * time.Second, 11 * time.Second, 19 * time.Second}
+	texts := []string{"An invented first line.", "An invented second line.", "An invented third line."}
+	if err := s.PutCues("pub-inv-1_1_VIDEO", "E", starts, ends, texts); err != nil {
+		t.Fatal(err)
+	}
+	// Another language's transcript of the same video must not leak in.
+	if err := s.PutCues("pub-inv-1_1_VIDEO", "S", starts[:1], ends[:1], []string{"Una línea inventada."}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.CuesOf("pub-inv-1_1_VIDEO", "E")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("want the three lines, got %d: %+v", len(got), got)
+	}
+	for i, c := range got {
+		if c.Seq != i {
+			t.Errorf("cue %d is out of order: seq %d", i, c.Seq)
+		}
+		if c.Key != "pub-inv-1_1_VIDEO" || c.Lang != "E" {
+			t.Errorf("a cue should know which video and language it belongs to: %+v", c)
+		}
+	}
+	if got[1].Seconds != 5 || got[1].End != 11*time.Second {
+		t.Errorf("second cue = %+v; want it to start at 5s and end at 11s", got[1])
+	}
+
+	if none, err := s.CuesOf("pub-inv-9_9_VIDEO", "E"); err != nil || len(none) != 0 {
+		t.Errorf("a video with no transcript = %+v, %v", none, err)
+	}
+}
+
+// An empty search result has two very different causes — nothing matched, or
+// nothing is indexed — and the count is what lets the CLI say which.
+func TestCueVideoCount(t *testing.T) {
+	s, err := Open(t.TempDir(), "E")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if n, err := s.CueVideoCount(""); err != nil || n != 0 {
+		t.Fatalf("an empty library = %d, %v", n, err)
+	}
+	for _, key := range []string{"pub-inv-1_1_VIDEO", "pub-inv-1_2_VIDEO"} {
+		if err := s.PutCues(key, "E", []time.Duration{0}, []time.Duration{2 * time.Second}, []string{"An invented line."}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.PutCues("pub-inv-1_3_VIDEO", "S", []time.Duration{0}, []time.Duration{2 * time.Second}, []string{"Una línea."}); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := s.CueVideoCount("E"); n != 2 {
+		t.Errorf("CueVideoCount(E) = %d, want 2", n)
+	}
+	if n, _ := s.CueVideoCount(""); n != 3 {
+		t.Errorf("CueVideoCount of every language = %d, want 3", n)
+	}
+}
