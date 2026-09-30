@@ -44,7 +44,11 @@ The Spanish command and flag names the CLI shipped with are kept as aliases
 
 ## Where things live
 
-- `internal/cdn` — downloads from the jw.org CDN and the publication catalogue.
+- `internal/cdn` — downloads from the jw.org CDN and the publication catalogue. Its two
+  endpoints are **fields of the `Client`**, not constants, so a test can point it at a local
+  server; a zero-value `Client` still reaches the real CDN. `Sync` is exercised end to end
+  that way, against a synthetic publication built by `internal/testutil` — nothing here needs
+  the network to be tested.
 - `internal/jwpub` — the format: a zip inside a zip, SQLite inside that, and the AES-128-CBC +
   zlib decryption of each document's content.
 - `internal/store` — the library: SQLite schema, the FTS5 index and the queries. **Never judge a
@@ -55,6 +59,9 @@ The Spanish command and flag names the CLI shipped with are kept as aliases
   `.jwpub` cache under `pubs/` is shared: its filenames already carry the language.
 - `internal/content` — publication HTML to text, markdown or JSON.
 - `internal/bible` — Bible references: parsing, ranges, book names and verse numbering.
+- The **glossary** keys every entry by its folded term (`FoldTerm`), so spellings that fold
+  the same are one way in. The publication writes the principal form first, and that is the
+  one kept: a later variant must not overwrite it.
 - `internal/meeting` — assembles the week's meeting from the indexed documents.
 - `internal/subs` — video subtitles.
 - `internal/cli` — the cobra tree. One file per command.
