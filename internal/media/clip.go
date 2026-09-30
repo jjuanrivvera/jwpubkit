@@ -1,4 +1,4 @@
-// Package media makes bounded remote clips using a range-only loopback proxy.
+// Package media extracts bounded remote clips and frames through range-only loopback proxies.
 package media
 
 import (
@@ -27,6 +27,7 @@ type Options struct {
 	From, To                  time.Duration
 	Mode, Output              string
 	TrafficBytes, OutputBytes int64
+	NoAudio, AudioOnly        bool
 	Client                    *http.Client
 	Run                       Run
 }
@@ -35,6 +36,8 @@ type Options struct {
 type Result struct {
 	Output        string  `json:"output"`
 	Mode          string  `json:"mode"`
+	NoAudio       bool    `json:"no_audio,omitempty"`
+	AudioOnly     bool    `json:"audio_only,omitempty"`
 	FromSeconds   float64 `json:"from_seconds"`
 	ToSeconds     float64 `json:"to_seconds"`
 	Duration      float64 `json:"duration_seconds"`
@@ -59,6 +62,7 @@ type rangeProxy struct {
 	failure  error
 	closing  bool
 	handlers sync.WaitGroup
+	cache    *blockCache
 }
 
 func (p *rangeProxy) fail(err error) {
@@ -111,6 +115,10 @@ func (p *rangeProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			p.fail(errors.New("invalid range end"))
 			return
 		}
+	}
+	if p.cache != nil {
+		p.serveCached(w, r, start, endRequested)
+		return
 	}
 	req, err := http.NewRequestWithContext(p.ctx, http.MethodGet, p.source, nil)
 	if err != nil {
@@ -179,7 +187,13 @@ func (p *rangeProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Clip rejects a server that sends full files for ranges, and publishes only a successful bounded output.
 func Clip(ctx context.Context, opt Options) (Result, error) {
-	result := Result{Output: opt.Output, Mode: opt.Mode, FromSeconds: opt.From.Seconds(), ToSeconds: opt.To.Seconds()}
+	result := Result{Output: opt.Output, Mode: opt.Mode, NoAudio: opt.NoAudio, AudioOnly: opt.AudioOnly, FromSeconds: opt.From.Seconds(), ToSeconds: opt.To.Seconds()}
+	if opt.NoAudio && opt.AudioOnly {
+		return result, errors.New("no-audio and audio-only are mutually exclusive")
+	}
+	if opt.AudioOnly && !strings.EqualFold(filepath.Ext(opt.Output), ".m4a") {
+		return result, errors.New("audio-only output must have a .m4a extension")
+	}
 	if opt.From < 0 || opt.To <= opt.From {
 		return result, errors.New("to must be after a nonnegative from")
 	}
@@ -204,7 +218,11 @@ func Clip(ctx context.Context, opt Options) (Result, error) {
 	if err := os.MkdirAll(filepath.Dir(opt.Output), 0o755); err != nil {
 		return result, err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(opt.Output), ".pubkit-clip-*.mp4")
+	suffix := ".mp4"
+	if opt.AudioOnly {
+		suffix = ".m4a"
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(opt.Output), ".pubkit-clip-*"+suffix)
 	if err != nil {
 		return result, err
 	}
@@ -216,39 +234,27 @@ func Clip(ctx context.Context, opt Options) (Result, error) {
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	proxy := &rangeProxy{ctx: runCtx, cancel: cancel, client: opt.Client, source: opt.URL, budget: opt.TrafficBytes}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	input, stopProxy, err := startProxy(proxy)
 	if err != nil {
 		return result, err
 	}
-	server := &http.Server{Handler: proxy, ReadHeaderTimeout: 10 * time.Second,
-		ConnState: func(conn net.Conn, state http.ConnState) {
-			// Keep loopback buffering small so a seek does not prefetch megabytes the player discards.
-			if state == http.StateNew {
-				if tcp, ok := conn.(*net.TCPConn); ok {
-					_ = tcp.SetWriteBuffer(32 * 1024)
-				}
-			}
-		}}
-	done := make(chan struct{})
-	go func() { defer close(done); _ = server.Serve(listener) }()
-	var stopped sync.Once
-	stopProxy := func() {
-		stopped.Do(func() {
-			proxy.mu.Lock()
-			proxy.closing = true
-			proxy.mu.Unlock()
-			cancel()
-			_ = server.Close()
-			proxy.handlers.Wait()
-			<-done
-		})
-	}
 	defer stopProxy()
-	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-ss", strconv.FormatFloat(opt.From.Seconds(), 'f', 3, 64), "-i", "http://" + listener.Addr().String() + "/source.mp4", "-t", strconv.FormatFloat((opt.To - opt.From).Seconds(), 'f', 3, 64)}
+	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-ss", strconv.FormatFloat(opt.From.Seconds(), 'f', 3, 64), "-i", input, "-t", strconv.FormatFloat((opt.To - opt.From).Seconds(), 'f', 3, 64)}
 	if opt.Mode == "copy" {
 		args = append(args, "-c", "copy")
 	} else {
-		args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac")
+		if !opt.AudioOnly {
+			args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20")
+		}
+		if !opt.NoAudio {
+			args = append(args, "-c:a", "aac")
+		}
+	}
+	if opt.NoAudio {
+		args = append(args, "-map", "0:v:0", "-an")
+	}
+	if opt.AudioOnly {
+		args = append(args, "-map", "0:a:0", "-vn")
 	}
 	args = append(args, "-fs", strconv.FormatInt(opt.OutputBytes-65536, 10), "-movflags", "+faststart", temp)
 	b, runErr := opt.Run(runCtx, "ffmpeg", args...)
@@ -296,4 +302,35 @@ func Clip(ctx context.Context, opt Options) (Result, error) {
 		return result, err
 	}
 	return result, os.Rename(temp, opt.Output)
+}
+
+func startProxy(proxy *rangeProxy) (string, func(), error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", nil, err
+	}
+	server := &http.Server{Handler: proxy, ReadHeaderTimeout: 10 * time.Second,
+		ConnState: func(conn net.Conn, state http.ConnState) {
+			// Keep loopback buffering small so a seek does not prefetch megabytes the player discards.
+			if state == http.StateNew {
+				if tcp, ok := conn.(*net.TCPConn); ok {
+					_ = tcp.SetWriteBuffer(32 * 1024)
+				}
+			}
+		}}
+	done := make(chan struct{})
+	go func() { defer close(done); _ = server.Serve(listener) }()
+	var stopped sync.Once
+	stopProxy := func() {
+		stopped.Do(func() {
+			proxy.mu.Lock()
+			proxy.closing = true
+			proxy.mu.Unlock()
+			proxy.cancel()
+			_ = server.Close()
+			proxy.handlers.Wait()
+			<-done
+		})
+	}
+	return "http://" + listener.Addr().String() + "/source.mp4", stopProxy, nil
 }

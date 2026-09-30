@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.0 - 2026-09-30
+
+- Capture JPG/PNG video frames at repeated marks or regular intervals, with optional
+  timestamped contact sheets, rendition selection and shared traffic/output budgets.
+- Cache bounded 256 KiB ranges between frame seeks and pace uncached origin requests;
+  validate staged images and preserve existing paths on failed batches.
+- Add silent MP4 clips (`--no-audio`) and audio-only M4A clips (`--audio-only`).
+- Exercise frame timing, range reuse, output rollback and audio flags with invented
+  images and local HTTP/tool doubles. Reject non-finite and overflowing clock times.
+- Raise the matching local and CI coverage floor to 66% (measured total about 68.5%).
+
 ## v0.10.1 - 2026-09-30
 
 - Resolve historical public Watchtower references from 2008–2015 under the wp API symbol,

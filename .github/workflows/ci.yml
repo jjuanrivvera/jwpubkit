@@ -21,10 +21,9 @@ jobs:
   ci:
     uses: jjuanrivvera/.github/.github/workflows/go-ci.yml@main
     with:
-      # Measured, not aspirational: the total sits around 50% (internal/cli near 21%,
-      # cdn uncovered) and drifts a point between runners, so the gate sits under it.
+      # Measured total is about 68.5%; leave room for runner variance.
       # It is a ratchet: raise it as the command layer gets covered.
-      coverage-threshold: "65"
+      coverage-threshold: "66"
       run-gosec: true
       # There is no tools/gendocs yet, so no generated documentation can drift.
       run-docs-check: false
