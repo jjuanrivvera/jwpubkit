@@ -11,12 +11,13 @@ import (
 )
 
 type verseResult struct {
-	Ref         string           `json:"reference"`
-	Ranges      []bible.Range    `json:"ranges"`
-	Verses      []store.Verse    `json:"verses"`
-	CitedBy     []store.Citation `json:"cited_in"`
-	CitedTotal  int              `json:"citing_documents_total"`
-	Translation string           `json:"translation"`
+	Ref         string            `json:"reference"`
+	Ranges      []bible.Range     `json:"ranges"`
+	Verses      []store.Verse     `json:"verses"`
+	CitedBy     []store.Citation  `json:"cited_in"`
+	CitedTotal  int               `json:"citing_documents_total"`
+	Commentary  []store.Commented `json:"commented_in,omitempty"`
+	Translation string            `json:"translation"`
 }
 
 func (a *app) verseCmd() *cobra.Command {
@@ -85,6 +86,20 @@ References are parsed in the library's language: "Jer 38:6", "Jeremiah 38:1-13",
 						return err
 					}
 					res.CitedBy = mergeCitations(res.CitedBy, cites)
+				}
+			}
+			// What has been published about the passage, through whatever index the
+			// library holds. It reaches publications that are not synced, so it is
+			// reported separately from the documents that quote it.
+			if !noCites {
+				for _, r := range ranges {
+					for id := r.FirstID(); id <= r.LastID(); id++ {
+						more, err := st.CommentedOn(id, citations)
+						if err != nil {
+							return err
+						}
+						res.Commentary = append(res.Commentary, more...)
+					}
 				}
 			}
 			res.CitedTotal = len(res.CitedBy)
@@ -232,6 +247,19 @@ func (a *app) printVerses(res verseResult, ranges []bible.Range) {
 	section("Footnotes", fns, "(none)")
 	section("Marginal references", xrefs, "(none)")
 	section("Study notes", notes, "(this Bible carries no notes for the passage)")
+	if len(res.Commentary) > 0 {
+		p("\nPublished about this passage (from the library's index):\n")
+		for _, c := range res.Commentary {
+			p("  %-26s %s", c.Cite, c.Title)
+			if !c.InLibrary {
+				p(" [not synced]")
+			}
+			p("\n")
+			if c.Text != "" {
+				p("    %s\n", truncate(c.Text, 150))
+			}
+		}
+	}
 	if res.CitedTotal > 0 || len(res.CitedBy) > 0 {
 		p("\nCited in %d documents in the library", res.CitedTotal)
 		if len(res.CitedBy) < res.CitedTotal {

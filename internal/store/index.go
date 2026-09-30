@@ -678,15 +678,18 @@ func (ix *indexer) studyNotes() error {
 		return nil
 	}
 	vc := "VerseCommentary"
-	rows, err := jf.DB.Query(fmt.Sprintf(`SELECT VerseCommentaryMap.BibleVerseId, VerseCommentary.VerseCommentaryId, %s, VerseCommentary.Content, %s
+	rows, err := jf.DB.Query(fmt.Sprintf(`SELECT VerseCommentaryMap.BibleVerseId, VerseCommentary.VerseCommentaryId, %s, VerseCommentary.Content, %s,
+			%s, %s
 		FROM VerseCommentaryMap JOIN VerseCommentary ON VerseCommentary.VerseCommentaryId = VerseCommentaryMap.VerseCommentaryId
 		ORDER BY VerseCommentaryMap.BibleVerseId, VerseCommentary.VerseCommentaryId`,
-		jf.Col(vc, "Label"), jf.Col(vc, "CommentaryMepsDocumentId")))
+		jf.Col(vc, "Label"), jf.Col(vc, "CommentaryMepsDocumentId"),
+		jf.Col(vc, "BeginParagraphOrdinal"), jf.Col(vc, "EndParagraphOrdinal")))
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	ins, err := ix.tx.Prepare(`INSERT INTO verse_note(verse_id, seq, label, text, html, docid, pub_id) VALUES(?,?,?,?,?,?,?)`)
+	ins, err := ix.tx.Prepare(`INSERT INTO verse_note(verse_id, seq, label, text, html, docid, pub_id, begin_pid, end_pid)
+		VALUES(?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -694,9 +697,9 @@ func (ix *indexer) studyNotes() error {
 	for rows.Next() {
 		var verseID, seq int
 		var label sql.NullString
-		var docid sql.NullInt64
+		var docid, beginPID, endPID sql.NullInt64
 		var blob []byte
-		if err := rows.Scan(&verseID, &seq, &label, &blob, &docid); err != nil {
+		if err := rows.Scan(&verseID, &seq, &label, &blob, &docid, &beginPID, &endPID); err != nil {
 			return err
 		}
 		if len(blob) == 0 {
@@ -707,7 +710,7 @@ func (ix *indexer) studyNotes() error {
 			return err
 		}
 		lbl := noteLabelRe.ReplaceAllString(content.InnerText(label.String), " ")
-		if _, err := ins.Exec(verseID, seq, lbl, content.InnerText(h), h, docid, ix.pubID); err != nil {
+		if _, err := ins.Exec(verseID, seq, lbl, content.InnerText(h), h, docid, ix.pubID, beginPID, endPID); err != nil {
 			return err
 		}
 		ix.stats.Notes++

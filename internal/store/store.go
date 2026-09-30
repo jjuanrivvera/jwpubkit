@@ -198,6 +198,41 @@ func (s *Store) backfillDocVideos() error {
 	return tx.Commit()
 }
 
+// addColumns adds columns a table is missing, leaving its rows alone. The values
+// arrive with the next sync of the publication that supplies them.
+func (s *Store) addColumns(table string, cols map[string]string) error {
+	rows, err := s.DB.Query(`SELECT name FROM pragma_table_info(?)`, table)
+	if err != nil {
+		return err
+	}
+	have := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			return err
+		}
+		have[name] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(have) == 0 {
+		return nil // the table does not exist yet; the schema will create it
+	}
+	for col, typ := range cols {
+		if have[col] {
+			continue
+		}
+		// #nosec G202 -- the names are constants in this file, never user input
+		if _, err := s.DB.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + col + ` ` + typ); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // migrateVerses rebuilds the verse table when it still uses the old layout, in
 // which the BibleVerseId was the primary key and a second Bible therefore
 // overwrote the first. Nothing is lost that cannot be rebuilt: the verses come
@@ -295,6 +330,13 @@ func (s *Store) Close() error { return s.DB.Close() }
 
 func (s *Store) migrate() error {
 	if _, err := s.DB.Exec(`CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT)`); err != nil {
+		return err
+	}
+	// Two columns added to verse_note after libraries existed: adding a column is
+	// cheap and keeps the indexed content, unlike a schema bump.
+	if err := s.addColumns("verse_note", map[string]string{
+		"begin_pid": "INTEGER", "end_pid": "INTEGER",
+	}); err != nil {
 		return err
 	}
 	// A Bible that predates verses being keyed per publication has to be rebuilt,
@@ -440,7 +482,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS par_fts USING fts5(
 	text, content='par', content_rowid='id', tokenize='unicode61 remove_diacritics 2');
 CREATE TABLE IF NOT EXISTS verse_note(      -- study notes (VerseCommentary)
 	verse_id INTEGER NOT NULL, seq INTEGER NOT NULL,
-	label TEXT, text TEXT NOT NULL, html TEXT NOT NULL, docid INTEGER, pub_id INTEGER NOT NULL
+	label TEXT, text TEXT NOT NULL, html TEXT NOT NULL, docid INTEGER, pub_id INTEGER NOT NULL,
+	-- The paragraphs of docid this note occupies. A study Bible's note is its own
+	-- document, but a study guide's "note" is a BLOCK of an index document, and
+	-- the pointers to other publications are the extracts inside that block. Without
+	-- the range there is no way to join the two, which is why they are kept.
+	begin_pid INTEGER, end_pid INTEGER
 );
 CREATE INDEX IF NOT EXISTS verse_note_v ON verse_note(verse_id);
 CREATE TABLE IF NOT EXISTS verse_fn(        -- footnotes of the Bible text

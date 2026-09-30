@@ -97,6 +97,24 @@ func (s *Store) VerseGraph(first, last int, lim GraphLimits) ([]Edge, error) {
 		return nil, err
 	}
 	add(terms...)
+
+	// The commentary index reaches publications nobody has synced, so it is the
+	// one edge that can answer beyond the library's own contents.
+	for id := first; id <= last; id++ {
+		commented, err := s.CommentedOn(id, lim.perRelation())
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range commented {
+			e := Edge{Relation: "commented-in", Source: "verse_note range ∩ extract (" + c.Via + ")",
+				DocID: c.DocID, Pub: c.Pub, Title: c.Title, Cite: c.Cite, URL: c.URL,
+				Paragraph: c.Paragraph, Text: c.Text}
+			if !c.InLibrary {
+				e.Kind = "not-synced"
+			}
+			out = append(out, e)
+		}
+	}
 	return out, nil
 }
 
