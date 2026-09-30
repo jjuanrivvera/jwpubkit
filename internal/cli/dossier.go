@@ -239,10 +239,26 @@ func chapterRanges(ref string) ([]bible.Range, error) {
 	return out, nil
 }
 
-// chapterSlug is an ASCII, filesystem-friendly form of a book's short name.
+// chapterSlug is a filename-safe form of a book's short name. Accented Latin
+// letters fold to ASCII where a mapping exists; a Greek or Cyrillic name is
+// kept as it is, because it has no ASCII form and an underscore would tell the
+// reader nothing about which chapter the file holds. Only the characters a
+// filesystem refuses are replaced.
 func chapterSlug(book int) string {
 	bk, _ := bible.BookByNum(book)
-	return foldASCII(strings.ReplaceAll(bk.Short, " ", ""))
+	return safeInFilename(foldASCII(strings.ReplaceAll(bk.Short, " ", "")))
+}
+
+// safeInFilename replaces the characters a name may not contain. The set is
+// Windows's, the strictest of the three platforms this is released for: a book
+// name learned from a foreign Bible is publication data, not something we chose.
+func safeInFilename(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || strings.ContainsRune(`/\:*?"<>|`, r) {
+			return '-'
+		}
+		return r
+	}, s)
 }
 
 var asciiReplacer = strings.NewReplacer(
