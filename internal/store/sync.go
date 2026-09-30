@@ -59,7 +59,7 @@ func (s *Store) Sync(ctx context.Context, c *cdn.Client, symbol, issue string, f
 		if issue != "" {
 			what += " " + issue
 		}
-		return nil, fmt.Errorf("pub-media no tiene %s en JWPUB para el idioma %s (HTTP 404)", what, c.Lang)
+		return nil, fmt.Errorf("pub-media has no JWPUB for %s in language %s (HTTP 404)", what, c.Lang)
 	}
 	if err != nil {
 		return nil, err

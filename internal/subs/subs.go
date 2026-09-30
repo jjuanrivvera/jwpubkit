@@ -146,7 +146,7 @@ func NormalizeKey(in string) (string, error) {
 		if item := u.Query().Get("item"); item != "" {
 			return item, nil
 		}
-		return "", fmt.Errorf("no encuentro la clave del video en %s", in)
+		return "", fmt.Errorf("no video key found in %s", in)
 	case strings.HasPrefix(in, "webpubvid://"):
 		q, err := url.ParseQuery(strings.TrimPrefix(strings.TrimPrefix(in, "webpubvid://"), "?"))
 		if err != nil {
@@ -170,7 +170,7 @@ func NormalizeKey(in string) (string, error) {
 		parts := strings.Split(in, ":")
 		return fmt.Sprintf("pub-%s_%s_%s_VIDEO", parts[0], parts[1], parts[2]), nil
 	}
-	return "", fmt.Errorf("clave de video no reconocida: %q (ejemplo: pub-jwb-125_4_VIDEO)", in)
+	return "", fmt.Errorf("unrecognized video key: %q (example: pub-jwb-125_4_VIDEO)", in)
 }
 
 // WatchURL builds the jw.org address of a video, at a second when one is given.

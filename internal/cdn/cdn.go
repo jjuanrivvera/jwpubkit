@@ -24,24 +24,53 @@ import (
 // cms-imgp and wol are pickier.
 const UserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
+// The two open endpoints this package reads. They are the defaults of a new
+// Client rather than constants used directly, so a test can point the client at
+// a local server: nothing here needs the real CDN to be exercised.
 const (
-	pubMediaURL = "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
-	mediatorURL = "https://b.jw-cdn.org/apis/mediator/v1/media-items"
+	DefaultPubMediaURL = "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
+	DefaultMediatorURL = "https://b.jw-cdn.org/apis/mediator/v1/media-items"
 )
 
 // ErrNotFound means the API answered 404: that publication, issue or video
 // does not exist in that language.
-var ErrNotFound = errors.New("no existe en la CDN")
+var ErrNotFound = errors.New("not in the CDN")
 
 // Client is a small HTTP client with sane timeouts.
 type Client struct {
 	HTTP *http.Client
 	Lang string // jw.org language symbol: "E", "S", "F"…
+
+	// PubMediaURL and MediatorURL are the endpoints to ask. New fills them
+	// with the real ones; a caller overrides them to aim somewhere else.
+	PubMediaURL string
+	MediatorURL string
 }
 
-// New returns a client for language lang ("S").
+// New returns a client for language lang ("E").
 func New(lang string) *Client {
-	return &Client{HTTP: &http.Client{Timeout: 10 * time.Minute}, Lang: lang}
+	return &Client{
+		HTTP:        &http.Client{Timeout: 10 * time.Minute},
+		Lang:        lang,
+		PubMediaURL: DefaultPubMediaURL,
+		MediatorURL: DefaultMediatorURL,
+	}
+}
+
+// pubMedia and mediator let a Client built without New still work: a zero
+// value means "the real endpoint", never an empty URL.
+func (c *Client) pubMedia() string {
+	if c.PubMediaURL == "" {
+		return DefaultPubMediaURL
+	}
+	return c.PubMediaURL
+}
+
+func (c *Client) mediator() string {
+	if c.MediatorURL == "" {
+		return DefaultMediatorURL
+	}
+	return c.MediatorURL
 }
 
 func (c *Client) get(ctx context.Context, u string) (*http.Response, error) {
@@ -58,7 +87,7 @@ func (c *Client) get(ctx context.Context, u string) (*http.Response, error) {
 		}
 		if err == nil {
 			resp.Body.Close()
-			err = fmt.Errorf("HTTP %d en %s", resp.StatusCode, u)
+			err = fmt.Errorf("HTTP %d from %s", resp.StatusCode, u)
 		}
 		select {
 		case <-ctx.Done():
@@ -75,7 +104,7 @@ func (c *Client) get(ctx context.Context, u string) (*http.Response, error) {
 		return nil, ErrNotFound
 	case resp.StatusCode != http.StatusOK:
 		resp.Body.Close()
-		return nil, fmt.Errorf("HTTP %d en %s", resp.StatusCode, u)
+		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, u)
 	}
 	return resp, nil
 }
@@ -168,7 +197,7 @@ func (c *Client) PubMedia(ctx context.Context, q PubMediaQuery) (*PubMedia, erro
 	v.Set("alllangs", "0")
 	v.Set("langwritten", c.Lang)
 	var pm PubMedia
-	if err := c.getJSON(ctx, pubMediaURL+"?"+v.Encode(), &pm); err != nil {
+	if err := c.getJSON(ctx, c.pubMedia()+"?"+v.Encode(), &pm); err != nil {
 		return nil, err
 	}
 	return &pm, nil
@@ -211,7 +240,7 @@ func (c *Client) Download(ctx context.Context, u, dest, wantMD5 string) (string,
 	got := hex.EncodeToString(h.Sum(nil))
 	if wantMD5 != "" && !strings.EqualFold(got, wantMD5) {
 		os.Remove(tmp)
-		return "", fmt.Errorf("checksum MD5 no coincide para %s: esperado %s, obtenido %s", filepath.Base(dest), wantMD5, got)
+		return "", fmt.Errorf("MD5 mismatch for %s: expected %s, got %s", filepath.Base(dest), wantMD5, got)
 	}
 	return got, os.Rename(tmp, dest)
 }
@@ -272,7 +301,7 @@ func (c *Client) MediaItem(ctx context.Context, key string) (*MediaItem, error) 
 	var ans struct {
 		Media []MediaItem `json:"media"`
 	}
-	u := fmt.Sprintf("%s/%s/%s?clientType=www", mediatorURL, c.Lang, url.PathEscape(key))
+	u := fmt.Sprintf("%s/%s/%s?clientType=www", c.mediator(), c.Lang, url.PathEscape(key))
 	if err := c.getJSON(ctx, u, &ans); err != nil {
 		return nil, err
 	}

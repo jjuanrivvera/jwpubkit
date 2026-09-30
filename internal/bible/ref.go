@@ -145,7 +145,7 @@ func Parse(s string) ([]Range, error) {
 			book = b.Num
 			rest = m[3]
 		} else if book == 0 {
-			return nil, fmt.Errorf("falta el libro en %q", seg)
+			return nil, fmt.Errorf("no book name in %q", seg)
 		}
 		rs, err := parseNumbers(book, strings.TrimSpace(rest))
 		if err != nil {
@@ -154,7 +154,7 @@ func Parse(s string) ([]Range, error) {
 		out = append(out, rs...)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no hay ninguna referencia en %q", s)
+		return nil, fmt.Errorf("no reference found in %q", s)
 	}
 	return out, nil
 }

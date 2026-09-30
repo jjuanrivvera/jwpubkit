@@ -95,7 +95,7 @@ func (jf *File) openZips() error {
 	}
 	outer, err := zip.NewReader(jf.f, st.Size())
 	if err != nil {
-		return fmt.Errorf("%s no es un JWPUB (zip): %w", filepath.Base(jf.Path), err)
+		return fmt.Errorf("%s is not a JWPUB (zip): %w", filepath.Base(jf.Path), err)
 	}
 	var contents *zip.File
 	for _, zf := range outer.File {
@@ -115,7 +115,7 @@ func (jf *File) openZips() error {
 		}
 	}
 	if contents == nil {
-		return errors.New("el JWPUB no trae el archivo contents")
+		return errors.New("the JWPUB carries no contents file")
 	}
 	// "contents" is normally stored uncompressed, so the inner zip can be read
 	// in place instead of copying a 300 MB entry into memory.
@@ -161,7 +161,7 @@ func (jf *File) openDB(tmpDir string) error {
 		}
 	}
 	if dbEntry == nil {
-		return errors.New("el JWPUB no trae base de datos")
+		return errors.New("the JWPUB carries no database")
 	}
 	if tmpDir != "" {
 		if err := os.MkdirAll(tmpDir, 0o755); err != nil {

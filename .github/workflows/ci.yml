@@ -24,7 +24,7 @@ jobs:
       # Measured, not aspirational: the total sits around 50% (internal/cli near 21%,
       # cdn uncovered) and drifts a point between runners, so the gate sits under it.
       # It is a ratchet: raise it as the command layer gets covered.
-      coverage-threshold: "50"
+      coverage-threshold: "55"
       run-gosec: true
       # There is no tools/gendocs yet, so no generated documentation can drift.
       run-docs-check: false
