@@ -21,6 +21,11 @@ func fixture(t *testing.T, name, stamp string, seed func(*sql.DB), files map[str
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Synthetic fixture construction needs no crash durability; saved archives are still validated.
+	db.SetMaxOpenConns(1)
+	if _, err = db.ExecContext(t.Context(), "PRAGMA journal_mode=MEMORY; PRAGMA synchronous=OFF"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = db.ExecContext(t.Context(), testSchema); err != nil {
 		t.Fatal(err)
 	}

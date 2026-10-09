@@ -62,6 +62,36 @@ decision and retain `--prefer`. Metadata-only conflicts use the configured strat
 The editor receives a temporary private file, deleted afterwards. For unattended
 merges, use `--prefer`; requesting interaction without a TTY fails clearly.
 
+With a common ancestor, deletion-aware merges use exactly two descendants:
+
+```sh
+pubkit backup merge local.jwlibrary incoming.jwlibrary --base ancestor.jwlibrary \
+  --prefer incoming.jwlibrary --dry-run --report deletions.json
+pubkit backup merge local.jwlibrary incoming.jwlibrary --base ancestor.jwlibrary \
+  --prefer newest --interactive -o next.jwlibrary
+```
+
+An ancestor row missing from either side is deleted if the other side left it
+unchanged. Deletion versus editing is a conflict and uses the global or table
+preference. In a three-way merge, a one-sided edit also survives an unchanged
+preferred side. New rows absent from the ancestor are additions. Notes use GUIDs;
+a recreated note with the same GUID and changed creation time or content counts
+as an edit. A byte-identical recreation cannot be distinguished from the original.
+Highlights include their complete block-range set. Deleting a highlight detaches
+surviving notes. Deleting a note, tag or playlist cascades to its relationships;
+keeping an edited parent restores children removed by the opposing cascade.
+`--prefer-playlists` and `--prefer-tag-maps` control those conflicts. Interactive
+three-way review offers A, B or skip for deletion and structural conflicts.
+The report includes the ancestor counts, deletion attempts, their outcomes and
+counts of removed ancestor rows, including in `--dry-run`.
+
+Tags, playlist items and playlist markers have no GUID. Unchanged rows are matched
+by their fields and relationships use remapped identities; edited rows fall back
+to their ancestor IDs. Use descendants of the supplied ancestor: independently
+reassigned IDs on edited GUID-less rows cannot reliably identify their lineage.
+Without `--base`, merge continues to union any number of inputs without propagating
+deletions. Use the correct ancestor rather than an arbitrary older backup.
+
 `backup annotate` is an experimental prototype for publication paragraphs and
 workbook textareas, using decrypted HTML already indexed in the local library:
 

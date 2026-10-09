@@ -24,7 +24,7 @@ func (a *app) backupCmd() *cobra.Command {
 		}
 		return a.printJSON(i)
 	}}
-	var output, prefer, device, report string
+	var output, prefer, device, report, base string
 	var dry bool
 	var interactive bool
 	tables := map[string]*string{}
@@ -34,6 +34,8 @@ Newest/oldest use the archive's lastModifiedDate; ties preserve input order.
 Per-table preferences override the global preference. Overlapping highlights retain
 the preferred range and only import uncovered numeric tokens. A whole-block range
 with unknown bounds loses to an overlapping preferred range and is reported.
+With --base, merge exactly two descendants and propagate deletions.
+Deletion versus editing is a conflict resolved by preference or --interactive.
 The output is a new archive; existing files are never overwritten.
 --dry-run performs the same merge and validation without writing an archive.
 The JSON report contains identifiers and counts, never note or answer text.`, Args: cobra.MinimumNArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
@@ -44,7 +46,7 @@ The JSON report contains identifiers and counts, never note or answer text.`, Ar
 		for t, p := range tables {
 			prefs[t] = *p
 		}
-		opts := backup.MergeOptions{Prefer: prefer, TablePrefer: prefs, Device: device, DryRun: dry}
+		opts := backup.MergeOptions{Base: base, Prefer: prefer, TablePrefer: prefs, Device: device, DryRun: dry}
 		if interactive {
 			resolver, err := a.backupResolver(cmd)
 			if err != nil {
@@ -72,12 +74,13 @@ The JSON report contains identifiers and counts, never note or answer text.`, Ar
 	}}
 	f := merge.Flags()
 	f.StringVarP(&output, "output", "o", "", "new output archive")
+	f.StringVar(&base, "base", "", "common ancestor for a three-way merge of exactly two backups")
 	f.StringVar(&prefer, "prefer", "", "preferred input path, newest or oldest (default: first input)")
 	f.StringVar(&device, "device-name", "", "output device name (default: preferred input device with merged suffix)")
 	f.StringVar(&report, "report", "", "write a private JSON report to a new file")
 	f.BoolVar(&dry, "dry-run", false, "merge and validate without writing an archive")
 	f.BoolVar(&interactive, "interactive", false, "review conflicting notes and answers in a terminal")
-	for flag, t := range map[string]string{"notes": "Note", "highlights": "UserMark", "input-fields": "InputField", "tags": "Tag", "bookmarks": "Bookmark"} {
+	for flag, t := range map[string]string{"notes": "Note", "highlights": "UserMark", "input-fields": "InputField", "tags": "Tag", "bookmarks": "Bookmark", "playlists": "PlaylistItem", "tag-maps": "TagMap"} {
 		p := new(string)
 		tables[t] = p
 		f.StringVar(p, "prefer-"+flag, "", "override conflict preference for "+flag)

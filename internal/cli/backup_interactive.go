@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,9 @@ func (a *app) backupResolver(cmd *cobra.Command) (backup.Resolver, error) {
 }
 
 func resolveBackupConflict(ctx context.Context, reader *bufio.Reader, out io.Writer, c backup.Conflict, first, second map[string]any) (map[string]any, error) {
+	if c.Kind == "delete_edit" || (c.Table != "Note" && c.Table != "InputField") {
+		return resolveStructuralConflict(reader, out, c, first, second)
+	}
 	field := "Content"
 	if c.Table == "InputField" {
 		field = "Value"
@@ -199,4 +203,35 @@ func wordDiff(a, b string) string {
 		}
 	}
 	return strings.Join(words, " ")
+}
+
+func resolveStructuralConflict(reader *bufio.Reader, out io.Writer, c backup.Conflict, first, second map[string]any) (map[string]any, error) {
+	display := func(v map[string]any) string {
+		if v["_deleted"] == true {
+			return "[deleted]"
+		}
+		b, _ := json.MarshalIndent(v, "", "  ")
+		return string(b)
+	}
+	fmt.Fprintf(out, "\n%s %s conflict %s\nA (preferred): %s\n%s\nB: %s\n%s\n", c.Table, c.Kind, c.Key, c.Winner, display(first), c.Other, display(second))
+	for {
+		fmt.Fprint(out, "[a] keep A, [b] keep B, [s/Enter] skip decision (keep preference): ")
+		line, err := reader.ReadString('\n')
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "a":
+			return first, nil
+		case "b":
+			return second, nil
+		case "", "s", "skip":
+			return nil, nil
+		default:
+			fmt.Fprintln(out, "Choose a, b or s.")
+		}
+	}
 }

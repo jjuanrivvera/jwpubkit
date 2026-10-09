@@ -87,3 +87,27 @@ func TestBackupCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestDeletionConflictChoices(t *testing.T) {
+	for _, choice := range []string{"a", "b", "s", "invalid\na", ""} {
+		a := map[string]any{"_deleted": true, "_source": "first"}
+		b := map[string]any{"Content": "Invented revision", "_source": "second"}
+		var out bytes.Buffer
+		got, err := resolveBackupConflict(t.Context(), bufio.NewReader(strings.NewReader(choice+"\n")), &out, backup.Conflict{Table: "Note", Kind: "delete_edit"}, a, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if choice == "b" && got["Content"] != "Invented revision" {
+			t.Fatal(got)
+		}
+		if (choice == "a" || choice == "invalid\na") && got["_deleted"] != true {
+			t.Fatal(got)
+		}
+		if (choice == "s" || choice == "") && got != nil {
+			t.Fatal(got)
+		}
+		if !strings.Contains(out.String(), "[deleted]") {
+			t.Fatal(out.String())
+		}
+	}
+}

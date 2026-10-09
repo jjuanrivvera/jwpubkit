@@ -34,6 +34,7 @@ type Conflict struct {
 	Other      string   `json:"other"`
 	Fields     []string `json:"fields"`
 	Resolution string   `json:"resolution"`
+	Kind       string   `json:"kind,omitempty"`
 }
 type Overlap struct {
 	Source     string `json:"source"`
@@ -46,17 +47,22 @@ type Overlap struct {
 	KeptGuid   string `json:"kept_guid"`
 }
 type Report struct {
-	Before       map[string]map[string]int    `json:"before"`
-	After        map[string]int               `json:"after"`
-	Added        map[string]map[string]int    `json:"added"`
-	Conflicts    []Conflict                   `json:"conflicts"`
-	Overlaps     []Overlap                    `json:"overlaps"`
-	RenamedMedia map[string]map[string]string `json:"renamed_media"`
-	Device       string                       `json:"device_name"`
-	DryRun       bool                         `json:"dry_run"`
+	Before        map[string]map[string]int    `json:"before"`
+	After         map[string]int               `json:"after"`
+	Added         map[string]map[string]int    `json:"added"`
+	Conflicts     []Conflict                   `json:"conflicts"`
+	Overlaps      []Overlap                    `json:"overlaps"`
+	RenamedMedia  map[string]map[string]string `json:"renamed_media"`
+	Device        string                       `json:"device_name"`
+	DryRun        bool                         `json:"dry_run"`
+	Base          string                       `json:"base,omitempty"`
+	BaseCounts    map[string]int               `json:"base_counts,omitempty"`
+	Deletions     []Deletion                   `json:"deletions,omitempty"`
+	DeletedCounts map[string]int               `json:"deleted_counts,omitempty"`
 }
 
 type MergeOptions struct {
+	Base        string
 	Prefer      string
 	TablePrefer map[string]string
 	Device      string
@@ -65,6 +71,8 @@ type MergeOptions struct {
 }
 
 // Resolver receives private text only when a caller explicitly requests interactive review.
+// Three-way versions carry _source, which must survive the decision, and deleted
+// versions carry _deleted=true. Returning nil retains the configured preference.
 type Resolver func(Conflict, map[string]any, map[string]any) (map[string]any, error)
 
 func readRows(ctx context.Context, db *sql.DB, table string) ([]row, error) {
@@ -232,6 +240,9 @@ func Merge(ctx context.Context, inputs []string, output string, opts MergeOption
 	if len(inputs) < 2 {
 		return nil, errors.New("merge requires at least two backups")
 	}
+	if opts.Base != "" && len(inputs) != 2 {
+		return nil, errors.New("--base requires exactly two side backups")
+	}
 	r := &Report{Before: map[string]map[string]int{}, Added: map[string]map[string]int{}, RenamedMedia: map[string]map[string]string{}, DryRun: opts.DryRun, Conflicts: []Conflict{}, Overlaps: []Overlap{}}
 	var src []*source
 	defer func() {
@@ -285,6 +296,32 @@ func Merge(ctx context.Context, inputs []string, output string, opts MergeOption
 			return nil, errors.New("input schemas differ; refusing a lossy merge")
 		}
 	}
+	var plan *threeWayPlan
+	if opts.Base != "" {
+		ancestor, e := loadSource(ctx, opts.Base)
+		if e != nil {
+			return nil, fmt.Errorf("ancestor: %w", e)
+		}
+		defer ancestor.a.Close()
+		baseSchema, e := readRows(ctx, ancestor.a.DB, "sqlite_master")
+		if e != nil {
+			return nil, e
+		}
+		if !sameSchema(schema, baseSchema) {
+			return nil, errors.New("ancestor schema differs from the sides")
+		}
+		i, e := ancestor.a.Inspect(ctx)
+		if e != nil {
+			return nil, e
+		}
+		r.Base = ancestor.name
+		r.BaseCounts = i.Counts
+		r.DeletedCounts = map[string]int{}
+		plan, e = planThreeWay(src, ancestor, opts, r)
+		if e != nil {
+			return nil, e
+		}
+	}
 	// File names are not identities: rename collisions before remapping media references.
 	for _, s := range src {
 		r.RenamedMedia[s.name] = map[string]string{}
@@ -322,7 +359,7 @@ func Merge(ctx context.Context, inputs []string, output string, opts MergeOption
 			return nil, err
 		}
 	}
-	m := merger{ctx: ctx, tx: tx, report: r, accepted: map[string][]acceptedRow{}, next: map[string]int64{}, resolve: opts.Resolve, playlistKeys: map[string]acceptedRow{}}
+	m := merger{ctx: ctx, tx: tx, report: r, accepted: map[string][]acceptedRow{}, next: map[string]int64{}, resolve: opts.Resolve, playlistKeys: map[string]acceptedRow{}, threeWay: plan != nil}
 	for _, t := range tableOrder {
 		if t == "BlockRange" {
 			continue
@@ -345,6 +382,9 @@ func Merge(ctx context.Context, inputs []string, output string, opts MergeOption
 					return nil, err
 				}
 			}
+		}
+		if plan != nil {
+			plan.bindAliases(t)
 		}
 	}
 	for _, s := range schema {
@@ -405,6 +445,7 @@ type merger struct {
 	next         map[string]int64
 	resolve      Resolver
 	playlistKeys map[string]acceptedRow
+	threeWay     bool
 }
 
 func (m *merger) remap(s *source, t string, v row) error {
@@ -452,7 +493,7 @@ func (m *merger) remap(s *source, t string, v row) error {
 func (m *merger) add(s *source, t string, original, v row) error {
 	id := scalarID(t)
 	k := tableKey(t, v)
-	if t == "PlaylistItem" {
+	if t == "PlaylistItem" && !m.threeWay {
 		signature, err := m.playlistKey(s, original, v)
 		if err != nil {
 			return err
