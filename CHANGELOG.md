@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.12.0 - 2026-10-08
+
+- Add `backup inspect`, `backup merge` and `backup annotate` for JW Library `.jwlibrary` backups (aliases `respaldo`,
+  `inspeccionar`, `unir`, `anotar`). Merge two or more backups, deduplicating locations by natural key, notes and
+  highlights by GUID and tags by type and name, remapping every ID and carrying media files.
+- Choose conflict winners with `--prefer <file|newest|oldest>`, per table when needed; review conflicts one by one with
+  `--interactive` (word diff, keep A or B, concatenate, edit in `$EDITOR`, skip) or report without writing (`--dry-run`).
+- Propagate deletions with three-way merges against a common ancestor (`--base`), including delete/edit conflicts,
+  re-creation by GUID and dependent rows.
+- Maintain a master backup with `backup sync` and `backup status`: store folder from `backup_store` in the config file,
+  the environment or `--store`, atomic master and base, rotating history and optional `--watch` of an inbox folder.
+- `backup annotate` adds highlights, notes and text-field answers anchored with undated publication keys.
+- Exercise every merge path with invented schema-16 databases; no real backups in the repository. Raise the coverage
+  floor to 70% (measured total about 72%).
+- Build with Go 1.26.9 and golang.org/x/net v0.60.0, fixing GO-2026-6617 in net/http.
+
 ## v0.11.0 - 2026-09-30
 
 - Capture JPG/PNG video frames at repeated marks or regular intervals, with optional

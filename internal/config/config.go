@@ -17,9 +17,10 @@ import (
 
 // Config is what a machine can decide once instead of on every command line.
 type Config struct {
-	Language string
-	Library  string
-	MediaDir string
+	Language    string
+	Library     string
+	MediaDir    string
+	BackupStore string
 	// Path is the file these came from, empty when there is none.
 	Path string
 }
@@ -69,6 +70,8 @@ func Load() Config {
 			c.Library = expand(value)
 		case "media_dir", "media-dir":
 			c.MediaDir = expand(value)
+		case "backup_store", "backup-store":
+			c.BackupStore = expand(value)
 		}
 	}
 	return c

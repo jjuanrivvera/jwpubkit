@@ -45,3 +45,18 @@ func TestLoadWithoutAFile(t *testing.T) {
 		t.Errorf("a missing file should leave everything unset, got %+v", c)
 	}
 }
+
+func TestBackupStorePath(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "config")
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
+	t.Setenv("JWPUBKIT_CONFIG", file)
+	if err := os.WriteFile(file, []byte("backup_store: '~/private-backups'\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got := Load()
+	if got.BackupStore != filepath.Join(dir, "private-backups") || got.Path != file {
+		t.Fatalf("%+v", got)
+	}
+}

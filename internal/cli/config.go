@@ -26,6 +26,7 @@ else ~/.config/pubkit/config. It takes one setting per line:
     language = S
     library = ~/.local/share/jwlib
     media_dir = ~/media
+    backup_store = ~/backups
 
 A flag beats an environment variable, which beats the file, which beats the default.`,
 		Args: cobra.NoArgs,
@@ -38,6 +39,7 @@ A flag beats an environment variable, which beats the file, which beats the defa
 				{"language", a.lang, a.origin(cmd, "language")},
 				{"library", a.libDir, a.origin(cmd, "library")},
 				{"media_dir", a.defaultMediaDir(), a.mediaOrigin()},
+				{"backup_store", a.defaultBackupStore(cmd), a.origin(cmd, "store")},
 			}
 			// Naming the database file matters: it is per language, and someone
 			// reasoning about a file the tool never showed them is how a full
@@ -78,4 +80,11 @@ func (a *app) mediaOrigin() string {
 		return a.cfg.Path
 	}
 	return "beside the library (" + filepath.Base(a.libDir) + "/media)"
+}
+
+func (a *app) defaultBackupStore(cmd *cobra.Command) string {
+	if a.origin(cmd, "store") == "built-in default" {
+		return filepath.Join(a.libDir, "backups")
+	}
+	return a.backupStore
 }
