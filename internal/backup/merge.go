@@ -20,11 +20,12 @@ var tableOrder = []string{"Location", "IndependentMedia", "PlaylistItemAccuracy"
 
 type row map[string]any
 type source struct {
-	name  string
-	a     *Archive
-	rows  map[string][]row
-	ids   map[string]map[any]any
-	paths map[string]string
+	name     string
+	a        *Archive
+	rows     map[string][]row
+	ids      map[string]map[any]any
+	paths    map[string]string
+	dateSpan *[2]time.Time
 }
 
 type Conflict struct {
@@ -68,6 +69,7 @@ type MergeOptions struct {
 	Device      string
 	DryRun      bool
 	Resolve     Resolver
+	sourceTimes map[string][2]time.Time
 }
 
 // Resolver receives private text only when a caller explicitly requests interactive review.
@@ -214,8 +216,8 @@ func ordered(src []*source, prefer string) ([]*source, error) {
 			}
 		}
 		sort.SliceStable(out, func(i, j int) bool {
-			a, _ := time.Parse(time.RFC3339, out[i].a.Manifest.Backup.LastModified)
-			b, _ := time.Parse(time.RFC3339, out[j].a.Manifest.Backup.LastModified)
+			a := sourceTime(out[i], prefer)
+			b := sourceTime(out[j], prefer)
 			if prefer == "newest" {
 				return a.After(b)
 			}
@@ -263,6 +265,9 @@ func Merge(ctx context.Context, inputs []string, output string, opts MergeOption
 			return nil, fmt.Errorf("%s: %w", name, e)
 		}
 		s := &source{name: abs, a: a, rows: map[string][]row{}, ids: map[string]map[any]any{}, paths: map[string]string{}}
+		if span, ok := opts.sourceTimes[abs]; ok {
+			s.dateSpan = &span
+		}
 		src = append(src, s)
 		i, e := a.Inspect(ctx)
 		if e != nil {
@@ -360,6 +365,9 @@ func Merge(ctx context.Context, inputs []string, output string, opts MergeOption
 		}
 	}
 	m := merger{ctx: ctx, tx: tx, report: r, accepted: map[string][]acceptedRow{}, next: map[string]int64{}, resolve: opts.Resolve, playlistKeys: map[string]acceptedRow{}, threeWay: plan != nil}
+	if plan != nil {
+		plan.reserveAncestorIDs(&m)
+	}
 	for _, t := range tableOrder {
 		if t == "BlockRange" {
 			continue
@@ -565,8 +573,13 @@ func (m *merger) add(s *source, t string, original, v row) error {
 		return m.addMark(s, original, v)
 	}
 	if id != "" {
-		m.next[t]++
-		v[id] = m.next[t]
+		planned, ok := s.ids[t][original[id]]
+		if m.threeWay && ok {
+			v[id] = planned
+		} else {
+			m.next[t]++
+			v[id] = m.next[t]
+		}
 		s.ids[t][original[id]] = v[id]
 	}
 	if t == "TagMap" {
@@ -766,4 +779,17 @@ func subtract(a, b row) ([]row, bool) {
 		out = append(out, r)
 	}
 	return out, true
+}
+
+// Intermediate sync archives have a new save date, which must not outweigh the
+// original input dates when resolving conflicts later in the same batch.
+func sourceTime(s *source, prefer string) time.Time {
+	if s.dateSpan != nil {
+		if prefer == "oldest" {
+			return s.dateSpan[0]
+		}
+		return s.dateSpan[1]
+	}
+	stamp, _ := time.Parse(time.RFC3339, s.a.Manifest.Backup.LastModified)
+	return stamp
 }

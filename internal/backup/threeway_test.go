@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -43,6 +44,7 @@ func TestThreeWayDeletions(t *testing.T) {
 		{"UserMark", "UPDATE Note SET UserMarkId=NULL; DELETE FROM BlockRange; DELETE FROM UserMark", "UPDATE BlockRange SET EndToken=8", 0},
 		{"InputField", "DELETE FROM InputField", "UPDATE InputField SET Value='Invented revision'", 0},
 		{"Bookmark", "DELETE FROM Bookmark", "UPDATE Bookmark SET Title='Invented revision'", 0},
+		{"Bookmark", "DELETE FROM Bookmark", "UPDATE Bookmark SET Slot=2", 0},
 		{"Tag", "DELETE FROM TagMap WHERE TagId=5; DELETE FROM Tag WHERE TagId=5", "UPDATE Tag SET Name='Invented renamed' WHERE TagId=5", 1},
 		{"TagMap", "DELETE FROM TagMap WHERE NoteId=4", "UPDATE TagMap SET Position=3 WHERE NoteId=4", 1},
 		{"PlaylistItem", "DELETE FROM TagMap WHERE PlaylistItemId=90; DELETE FROM PlaylistItemMarkerBibleVerseMap; DELETE FROM PlaylistItemMarkerParagraphMap; DELETE FROM PlaylistItemMarker; DELETE FROM PlaylistItemLocationMap; DELETE FROM PlaylistItemIndependentMediaMap; DELETE FROM PlaylistItem", "UPDATE PlaylistItem SET Label='Invented revision'", 0},
@@ -184,5 +186,132 @@ func TestThreeWayRemappedReferences(t *testing.T) {
 	}
 	if _, err = os.Stat(out); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestThreeWayThumbnailEditVersusDeletion(t *testing.T) {
+	original := ancestorFixture(t)
+	base := descendant(t, original, "thumbnail-only", func(db *sql.DB) {
+		execTest(t, db, "DELETE FROM PlaylistItemIndependentMediaMap; UPDATE PlaylistItem SET ThumbnailFilePath='media.bin'")
+	})
+	removed := descendant(t, base, "removed", func(db *sql.DB) {
+		execTest(t, db, "DELETE FROM TagMap WHERE PlaylistItemId=90; DELETE FROM PlaylistItemMarkerBibleVerseMap; DELETE FROM PlaylistItemMarkerParagraphMap; DELETE FROM PlaylistItemMarker; DELETE FROM PlaylistItemLocationMap; DELETE FROM PlaylistItem")
+	})
+	edited := descendant(t, base, "edited", func(db *sql.DB) { execTest(t, db, "UPDATE IndependentMedia SET Hash='invented-revised-thumbnail'") })
+	r, err := Merge(t.Context(), []string{removed, edited}, "", MergeOptions{Base: base, DryRun: true, Prefer: edited})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, c := range r.Conflicts {
+		if c.Table == "PlaylistItem" && c.Kind == "delete_edit" {
+			found = true
+		}
+	}
+	if !found || r.After["PlaylistItem"] != 1 {
+		t.Fatalf("thumbnail edit was lost: %+v", r)
+	}
+}
+
+func TestThreeWayUnchangedDuplicatePlaylistLabels(t *testing.T) {
+	original := ancestorFixture(t)
+	base := descendant(t, original, "duplicate-labels", func(db *sql.DB) {
+		execTest(t, db, "INSERT INTO PlaylistItem SELECT 91,Label,StartTrimOffsetTicks,EndTrimOffsetTicks,Accuracy,EndAction,ThumbnailFilePath FROM PlaylistItem; INSERT INTO PlaylistItemIndependentMediaMap VALUES(91,80,99); INSERT INTO PlaylistItemLocationMap VALUES(91,1,1,99); INSERT INTO TagMap(TagMapId,PlaylistItemId,TagId,Position) VALUES(114,91,111,1)")
+	})
+	first, second := descendant(t, base, "first", nil), descendant(t, base, "second", nil)
+	r, err := Merge(t.Context(), []string{first, second}, "", MergeOptions{Base: base, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(r.After, r.BaseCounts) || len(r.Deletions) != 0 || len(r.Conflicts) != 0 {
+		t.Fatalf("unchanged ancestry lost data: %+v", r)
+	}
+}
+
+func TestThreeWayMarkCascadePreservesNoteEdits(t *testing.T) {
+	base := ancestorFixture(t)
+	removed := descendant(t, base, "removed", func(db *sql.DB) {
+		execTest(t, db, "UPDATE Note SET UserMarkId=NULL; DELETE FROM BlockRange; DELETE FROM UserMark")
+	})
+	edited := descendant(t, base, "edited", func(db *sql.DB) {
+		execTest(t, db, "UPDATE Note SET Content='Invented independent edit'; UPDATE UserMark SET ColorIndex=2")
+	})
+	for _, keep := range []bool{false, true} {
+		prefer := removed
+		if keep {
+			prefer = edited
+		}
+		out := filepath.Join(t.TempDir(), "out.jwlibrary")
+		r, err := Merge(t.Context(), []string{removed, edited}, out, MergeOptions{Base: base, Prefer: prefer})
+		if err != nil {
+			t.Fatal(err)
+		}
+		a, err := Open(t.Context(), out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var text string
+		var mark sql.NullInt64
+		err = a.DB.QueryRowContext(t.Context(), "SELECT Content,UserMarkId FROM Note").Scan(&text, &mark)
+		a.Close()
+		if err != nil || text != "Invented independent edit" || mark.Valid != keep {
+			t.Fatalf("keep=%v note=%s mark=%+v %v", keep, text, mark, err)
+		}
+		for _, c := range r.Conflicts {
+			if c.Table == "Note" {
+				t.Fatal("cascade cleanup produced a false note conflict", c)
+			}
+		}
+	}
+	// A note edited on the deleting side is reattached if the mark's edit is kept.
+	left := descendant(t, base, "left", func(db *sql.DB) {
+		execTest(t, db, "UPDATE Note SET Content='Invented left edit',UserMarkId=NULL; DELETE FROM BlockRange; DELETE FROM UserMark")
+	})
+	right := descendant(t, base, "right", func(db *sql.DB) { execTest(t, db, "UPDATE UserMark SET ColorIndex=2") })
+	out := filepath.Join(t.TempDir(), "reattached.jwlibrary")
+	if _, err := Merge(t.Context(), []string{left, right}, out, MergeOptions{Base: base, Prefer: right}); err != nil {
+		t.Fatal(err)
+	}
+	a, err := Open(t.Context(), out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	var text string
+	var mark sql.NullInt64
+	if err = a.DB.QueryRowContext(t.Context(), "SELECT Content,UserMarkId FROM Note").Scan(&text, &mark); err != nil {
+		t.Fatal(err)
+	}
+	if text != "Invented left edit" || !mark.Valid {
+		t.Fatalf("%s %+v", text, mark)
+	}
+}
+
+func TestThreeWayNoteEditDoesNotResurrectDeletedMark(t *testing.T) {
+	base := ancestorFixture(t)
+	removed := descendant(t, base, "removed", func(db *sql.DB) {
+		execTest(t, db, "UPDATE Note SET UserMarkId=NULL; DELETE FROM BlockRange; DELETE FROM UserMark")
+	})
+	edited := descendant(t, base, "edited-note", func(db *sql.DB) { execTest(t, db, "UPDATE Note SET Content='Invented independent note edit'") })
+	out := filepath.Join(t.TempDir(), "out.jwlibrary")
+	r, err := Merge(t.Context(), []string{removed, edited}, out, MergeOptions{Base: base, Prefer: edited})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.After["UserMark"] != 0 || len(r.Conflicts) != 0 {
+		t.Fatalf("independent note edit resurrected a mark: %+v", r)
+	}
+	a, err := Open(t.Context(), out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	var text string
+	var mark sql.NullInt64
+	if err = a.DB.QueryRowContext(t.Context(), "SELECT Content,UserMarkId FROM Note").Scan(&text, &mark); err != nil {
+		t.Fatal(err)
+	}
+	if text != "Invented independent note edit" || mark.Valid {
+		t.Fatalf("%s %+v", text, mark)
 	}
 }

@@ -85,7 +85,7 @@ The JSON report contains identifiers and counts, never note or answer text.`, Ar
 		tables[t] = p
 		f.StringVar(p, "prefer-"+flag, "", "override conflict preference for "+flag)
 	}
-	cmd.AddCommand(inspect, merge, a.backupAnnotateCmd())
+	cmd.AddCommand(inspect, merge, a.backupAnnotateCmd(), a.backupSyncCmd(), a.backupStatusCmd())
 	return cmd
 }
 

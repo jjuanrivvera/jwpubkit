@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,13 +33,14 @@ var Version = "dev"
 const defaultLang = "E"
 
 type app struct {
-	cfg     config.Config
-	origins map[string]string // where each setting came from, for `pubkit config`
-	jsonOut bool
-	libDir  string
-	offline bool
-	lang    string
-	quiet   bool
+	cfg         config.Config
+	origins     map[string]string // where each setting came from, for `pubkit config`
+	jsonOut     bool
+	libDir      string
+	backupStore string
+	offline     bool
+	lang        string
+	quiet       bool
 
 	clipRun media.Run
 	st      *store.Store
@@ -50,7 +52,7 @@ type app struct {
 
 // Execute runs the CLI and returns the process exit code.
 func Execute() int {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	a := &app{out: os.Stdout, err: os.Stderr, ctx: ctx, cfg: config.Load(), origins: map[string]string{}}
 	root := a.rootCmd()
@@ -76,6 +78,11 @@ var legacyFlags = map[string]string{
 	"forzar":             "force",
 	"limite":             "limit",
 	"listar":             "list",
+	"almacen":            "store",
+	"vigilar":            "watch",
+	"historial":          "history-limit",
+	"ancestro":           "base",
+	"informe":            "report",
 	"salida":             "output",
 	"preferir":           "prefer",
 	"interactivo":        "interactive", //nolint:misspell // Spanish compatibility alias.
@@ -127,6 +134,8 @@ Library: ~/.local/share/jwlib (change it with --library, JWPUBKIT_HOME or JWLIB_
 	pf.StringVar(&a.libDir, "library", a.settle("library", store.DefaultDir(), a.cfg.Library, "JWPUBKIT_HOME", "JWLIB_HOME"), "local library directory")
 	pf.BoolVar(&a.offline, "offline", false, "stay off the network (no sync, no CDN lookups)")
 	pf.StringVar(&a.lang, "language", a.settle("language", defaultLang, a.cfg.Language, "JWPUBKIT_LANG"), "publication language (jw.org symbol: E english, S spanish, F french…)")
+	pf.StringVar(&a.backupStore, "store", a.settle("store", filepath.Join(a.libDir, "backups"), a.cfg.BackupStore, "JWPUBKIT_BACKUP_STORE", "JWLIB_BACKUP_STORE"), "backup master store directory")
+	_ = root.MarkPersistentFlagDirname("store")
 	pf.BoolVarP(&a.quiet, "quiet", "q", false, "do not print progress on stderr")
 	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.readingTimeCmd(), a.chainCmd(), a.graphCmd(), a.completionCmd(), a.versionCmd(), a.dailyCmd(), a.watchtowerCmd(), a.placesCmd(), a.updateWeekCmd(), a.catalogCmd(), a.mediaCmd(), a.backupCmd())
 	return root

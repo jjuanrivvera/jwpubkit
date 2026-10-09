@@ -85,12 +85,80 @@ three-way review offers A, B or skip for deletion and structural conflicts.
 The report includes the ancestor counts, deletion attempts, their outcomes and
 counts of removed ancestor rows, including in `--dry-run`.
 
-Tags, playlist items and playlist markers have no GUID. Unchanged rows are matched
+Tags, bookmarks, playlist items and playlist markers have no GUID. Unchanged rows are matched
 by their fields and relationships use remapped identities; edited rows fall back
-to their ancestor IDs. Use descendants of the supplied ancestor: independently
+to their ancestor IDs. Three-way output preserves those ancestor IDs. Use descendants of the supplied ancestor: independently
 reassigned IDs on edited GUID-less rows cannot reliably identify their lineage.
 Without `--base`, merge continues to union any number of inputs without propagating
 deletions. Use the correct ancestor rather than an arbitrary older backup.
+
+### Keeping a master backup
+
+Set a dedicated private store with the existing configuration format:
+
+```ini
+# ~/.config/pubkit/config
+backup_store = ~/backups/study
+```
+
+`JWPUBKIT_BACKUP_STORE` overrides the file (`JWLIB_BACKUP_STORE` is also accepted),
+and `--store` overrides both. Without a setting, the store is `backups/` under the
+selected library directory. `pubkit config` shows `backup_store` and its origin.
+
+```sh
+pubkit config --json
+pubkit backup sync initial.jwlibrary --device-name "Study master"
+pubkit backup sync workstation.jwlibrary tablet.jwlibrary --prefer newest
+pubkit backup status
+pubkit backup status --json --store ~/backups/study
+pubkit backup sync --watch ~/incoming-backups --history-limit 10
+```
+
+The first import initializes the master. If the first batch contains several
+unrelated backups, they are unioned because no ancestor is known yet. Subsequent
+batches merge the master with every incoming backup against **one common stored
+ancestor** and propagate deletions. The ready-to-restore filename is always
+`<store>/master.jwlibrary`. After a successful batch, `<store>/base.jwlibrary` is
+also updated to that result. Export backups from devices that restored that
+master before the next batch. Collect descendants of one distributed master into
+the same invocation; a snapshot from an older branch requires the appropriate
+ancestor with `--base <older-master.jwlibrary>`, available in the history reported
+by `backup status`. A single stored base cannot infer arbitrary device ancestry.
+This also applies to consecutive batches in watch mode.
+
+`--prefer` defaults to `newest`. It accepts `newest`, `oldest`, `master`, `incoming`
+or an incoming path. Table preferences and `--interactive` work as in `backup
+merge`. Original input dates decide conflicts throughout a batch; an intermediate
+save date never gives a side extra priority. `--device-name` defaults to `pubkit
+master`. To preview a synchronization, use `backup merge` with the current master,
+incoming file and `--base <store>/base.jwlibrary --dry-run --report preview.json`.
+
+The store keeps complete versions under `history/`, with `current.json` selecting
+one version containing its master, base and bookkeeping. Stable archive names
+export that version. A process lock prevents concurrent updates, and the pointer
+changes only after the whole batch validates and is saved. Failed batches leave
+the previous master intact. `backup status` repairs exports after an interrupted
+publication and shows the master, archive date, device name, table counts, last
+synchronization and retained history (history paths are included with `--json`).
+The default rotation retains ten previous masters plus the current one;
+`--history-limit 0` keeps only the current version. Incoming snapshots are tracked
+by file hash, so repeating an already imported file does not apply it again.
+Ordinary `sync` keeps incoming files in place.
+
+`--watch <directory>` polls until interrupted, waits for two unchanged scans,
+validates complete `.jwlibrary` files and imports each ready batch. Successfully
+imported files move to `<directory>/procesados`; filename collisions preserve both
+files. Invalid or incomplete files stay in place and are retried when they change.
+Temporary store failures retry automatically. Import bookkeeping makes a retry
+safe if the process stopped between updating the master and moving an input.
+The incoming directory and store must be separate. Watch emits JSON events,
+including errors; `procesados` retains original incoming files independently of
+master history rotation.
+
+Spanish aliases include `respaldo sincronizar`, `respaldo estado`, `--almacen`,
+`--vigilar`, `--historial`, `--ancestro` and `--informe`; the help and output remain
+in English. Existing aliases such as `--preferir`, `--interactivo` and
+`--nombre-dispositivo` also apply.
 
 `backup annotate` is an experimental prototype for publication paragraphs and
 workbook textareas, using decrypted HTML already indexed in the local library:

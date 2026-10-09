@@ -21,9 +21,9 @@ jobs:
   ci:
     uses: jjuanrivvera/.github/.github/workflows/go-ci.yml@main
     with:
-      # Measured total is about 68.5%; leave room for runner variance.
+      # Leave room for runner variance below the measured total.
       # It is a ratchet: raise it as the command layer gets covered.
-      coverage-threshold: "67"
+      coverage-threshold: "70"
       run-gosec: true
       # There is no tools/gendocs yet, so no generated documentation can drift.
       run-docs-check: false

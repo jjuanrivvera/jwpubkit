@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,4 +93,44 @@ func TestNoSettingsFileIsNotAnError(t *testing.T) {
 	if !strings.Contains(out, "language   E") {
 		t.Errorf("the built-in default should apply:\n%s", out)
 	}
+}
+
+func TestBackupStorePrecedence(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config")
+	fileStore := filepath.Join(dir, "file")
+	envStore := filepath.Join(dir, "environment")
+	flagStore := filepath.Join(dir, "flag")
+	if err := os.WriteFile(cfg, []byte("backup_store = "+fileStore+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("JWPUBKIT_CONFIG", cfg)
+	t.Setenv("JWPUBKIT_HOME", dir)
+	t.Setenv("JWPUBKIT_BACKUP_STORE", "")
+	t.Setenv("JWLIB_BACKUP_STORE", "")
+	check := func(want, origin string, args ...string) {
+		t.Helper()
+		var output map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(runCLI(t, args...)), &output); err != nil {
+			t.Fatal(err)
+		}
+		var setting map[string]string
+		if err := json.Unmarshal(output["backup_store"], &setting); err != nil {
+			t.Fatal(err)
+		}
+		if setting["value"] != want || setting["from"] != origin {
+			t.Fatal(setting)
+		}
+	}
+	check(fileStore, cfg, "config", "--json")
+	t.Setenv("JWLIB_BACKUP_STORE", envStore)
+	check(envStore, "JWLIB_BACKUP_STORE", "config", "--json")
+	t.Setenv("JWPUBKIT_BACKUP_STORE", flagStore)
+	check(flagStore, "JWPUBKIT_BACKUP_STORE", "config", "--json")
+	check(fileStore, "--store", "config", "--json", "--almacen", fileStore)
+	t.Setenv("JWPUBKIT_BACKUP_STORE", "")
+	t.Setenv("JWLIB_BACKUP_STORE", "")
+	t.Setenv("JWPUBKIT_CONFIG", filepath.Join(dir, "missing"))
+	library := filepath.Join(dir, "library")
+	check(filepath.Join(library, "backups"), "built-in default", "config", "--json", "--library", library)
 }

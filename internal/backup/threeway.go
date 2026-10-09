@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -85,6 +86,14 @@ func (v *snapshot) canonical(t string, r row) row {
 			out[c] = v.identities[parent][value]
 		}
 	}
+	if t == "PlaylistItem" && r["ThumbnailFilePath"] != nil {
+		for _, media := range v.s.rows["IndependentMedia"] {
+			if media["FilePath"] == r["ThumbnailFilePath"] {
+				out["ThumbnailFilePath"] = v.identities["IndependentMedia"][media["IndependentMediaId"]]
+				break
+			}
+		}
+	}
 	return out
 }
 
@@ -98,31 +107,55 @@ func newSnapshot(s *source, base *snapshot) *snapshot {
 		if t == "BlockRange" {
 			continue
 		}
+		var baseKeys []string
+		if base != nil {
+			for k := range base.entries[t] {
+				baseKeys = append(baseKeys, k)
+			}
+			sort.Strings(baseKeys)
+		}
 		for _, r := range s.rows[t] {
 			c := v.canonical(t, r)
 			k := tableKey(t, c)
 			if t == "IndependentMedia" {
-				k = key(c, "FilePath", "Hash")
+				filename, _ := c["FilePath"].(string)
+				digest := sha256.Sum256(s.a.Files[filename])
+				media := copyRow(c)
+				media["bytes_sha256"] = fmt.Sprintf("%x", digest)
+				k = key(media, "FilePath", "Hash", "bytes_sha256")
 			}
-			if t == "Tag" || t == "PlaylistItem" || t == "PlaylistItemMarker" {
+			if t == "Tag" || t == "PlaylistItem" || t == "PlaylistItemMarker" || t == "Bookmark" {
 				if t == "PlaylistItem" {
-					k = "item:" + key(c, "Label", "StartTrimOffsetTicks", "EndTrimOffsetTicks", "Accuracy", "EndAction", "ThumbnailFilePath")
+					k = "item:" + key(row{"item": v.comparable(t, r, true)}, "item")
 				}
 				if base == nil {
 					k = fmt.Sprintf("ancestor:%s:%v", t, r[scalarID(t)])
 				} else {
 					matched := ""
-					for bk, br := range base.entries[t] {
-						if reflect.DeepEqual(base.canonical(t, br), c) {
-							matched = bk
-							break
+					candidate := base.identities[t][r[scalarID(t)]]
+					equal := func(br row) bool {
+						if t == "PlaylistItem" {
+							return reflect.DeepEqual(base.comparable(t, br, true), v.comparable(t, r, true))
+						}
+						return reflect.DeepEqual(base.canonical(t, br), c) || tableKey(t, base.canonical(t, br)) == tableKey(t, c)
+					}
+					if candidate != "" && equal(base.entries[t][candidate]) {
+						matched = candidate
+					}
+					if matched == "" {
+						for _, bk := range baseKeys {
+							if v.entries[t][bk] == nil && equal(base.entries[t][bk]) {
+								matched = bk
+								break
+							}
 						}
 					}
-					// GUID-less rows retain their ancestor IDs on normal JW Library descendants.
-					// Prefer semantic matches so an unchanged renumbered row is not mistaken for a deletion.
+					// Semantic matches recognize unchanged renumbered rows; ancestor IDs retain
+					// edits on GUID-less descendants, including repeated playlist labels.
 					if matched == "" {
-						matched = base.identities[t][r[scalarID(t)]]
+						matched = candidate
 					}
+
 					if matched != "" {
 						k = matched
 					}
@@ -152,7 +185,7 @@ func (v *snapshot) comparable(t string, r row, dependents bool) row {
 		sort.Strings(ranges)
 		out["ranges"] = ranges
 	}
-	if dependents {
+	if dependents && t != "UserMark" {
 		id := scalarID(t)
 		children := map[string][]string{}
 		for _, child := range tableOrder {
@@ -164,6 +197,7 @@ func (v *snapshot) comparable(t string, r row, dependents bool) row {
 					continue
 				}
 				canonical := v.comparable(child, cr, child == "PlaylistItemMarker")
+				delete(canonical, id)
 				children[child] = append(children[child], key(row{"row": canonical}, "row"))
 			}
 		}
@@ -247,12 +281,23 @@ func planThreeWay(src []*source, ancestor *source, opts MergeOptions, report *Re
 				s := rows[k]
 				if s.snap == v {
 					r := copyRow(s.r)
-					if t == "Note" && r["UserMarkId"] != nil {
-						mark := v.identities["UserMark"][r["UserMarkId"]]
-						if _, ok := p.selected["UserMark"][mark]; !ok {
-							r["UserMarkId"] = nil
+					if t == "Note" {
+						if r["UserMarkId"] != nil {
+							mark := v.identities["UserMark"][r["UserMarkId"]]
+							if _, ok := p.selected["UserMark"][mark]; !ok {
+								r["UserMarkId"] = nil
+							}
+						}
+						if r["UserMarkId"] == nil {
+							mark := p.restoredNoteMark(v, r)
+							if mark != "" {
+								virtualID := "restored-mark:" + mark
+								r["UserMarkId"] = virtualID
+								v.identities["UserMark"][virtualID] = mark
+							}
 						}
 					}
+
 					v.s.rows[t] = append(v.s.rows[t], r)
 				}
 			}
@@ -339,13 +384,13 @@ func (p *threeWayPlan) decide(t, k string, base, a, b row, first, second *snapsh
 	dependent := a == nil || b == nil
 	var ca, cb, ancestor row
 	if a != nil {
-		ca = first.comparable(t, a, dependent)
+		ca = p.comparable(first, t, a, dependent)
 	}
 	if b != nil {
-		cb = second.comparable(t, b, dependent)
+		cb = p.comparable(second, t, b, dependent)
 	}
 	if base != nil {
-		ancestor = p.base.comparable(t, base, dependent)
+		ancestor = p.comparable(p.base, t, base, dependent)
 	}
 	if dependent && (reflect.DeepEqual(ca, ancestor) || reflect.DeepEqual(cb, ancestor)) {
 		p.recordDelete(t, k, base, missing, "removed", r)
@@ -442,10 +487,13 @@ func (p *threeWayPlan) bindAliases(t string) {
 			continue
 		}
 		for _, v := range p.sides {
-			if r, ok := v.entries[t][k]; ok {
-				v.s.ids[t][r[id]] = mapped
+			for originalID, identity := range v.identities[t] {
+				if identity == k {
+					v.s.ids[t][originalID] = mapped
+				}
 			}
 		}
+
 	}
 }
 
@@ -476,4 +524,58 @@ func (p *threeWayPlan) reportRangeDeletions(report *Report) {
 			report.DeletedCounts["BlockRange"]++
 		}
 	}
+}
+
+// Preserve GUID-less ancestor IDs across sync generations so later renames and
+// marker edits retain their lineage. New rows allocate above the ancestor's IDs.
+func (p *threeWayPlan) reserveAncestorIDs(m *merger) {
+	for _, t := range []string{"Tag", "PlaylistItem", "PlaylistItemMarker", "Bookmark"} {
+		id := scalarID(t)
+		for _, r := range p.base.entries[t] {
+			n, _ := r[id].(int64)
+			if n > m.next[t] {
+				m.next[t] = n
+			}
+		}
+		for k, chosen := range p.selected[t] {
+			if original, ok := p.base.entries[t][k]; ok {
+				chosen.snap.s.ids[t][chosen.r[id]] = original[id]
+			}
+		}
+	}
+}
+
+// Detaching a note while deleting its highlight is cascade cleanup. It must not
+// compete with an independent text edit, or survive a decision to restore the mark.
+func (p *threeWayPlan) comparable(v *snapshot, t string, r row, dependents bool) row {
+	out := v.comparable(t, r, dependents)
+	if t != "Note" {
+		return out
+	}
+	if mark, ok := out["UserMarkId"].(string); ok {
+		if _, exists := p.selected["UserMark"][mark]; !exists {
+			out["UserMarkId"] = nil
+		}
+	}
+	if out["UserMarkId"] == nil {
+		if mark := p.restoredNoteMark(v, r); mark != "" {
+			out["UserMarkId"] = mark
+		}
+	}
+	return out
+}
+
+func (p *threeWayPlan) restoredNoteMark(v *snapshot, r row) string {
+	if r["UserMarkId"] != nil {
+		return ""
+	}
+	base := p.base.entries["Note"][tableKey("Note", r)]
+	if base == nil || base["UserMarkId"] == nil {
+		return ""
+	}
+	mark := p.base.identities["UserMark"][base["UserMarkId"]]
+	if _, kept := p.selected["UserMark"][mark]; kept && v.entries["UserMark"][mark] == nil {
+		return mark
+	}
+	return ""
 }
