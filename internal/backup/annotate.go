@@ -132,9 +132,13 @@ func document(ctx context.Context, library *sql.DB, docid int64) (row, string, e
 	v := row{"LocationId": nil, "BookNumber": nil, "ChapterNumber": nil, "DocumentId": docid, "Track": nil, "Type": int64(0), "Specialty": nil, "Edition": nil}
 	var symbol, title, src string
 	var language, issue int64
-	err := library.QueryRowContext(ctx, `SELECT COALESCE(NULLIF(pub.meps_symbol,''),pub.symbol),pub.meps_lang,COALESCE(pub.issue_tag,0),COALESCE(doc.title,''),doc.html FROM doc JOIN pub ON pub.id=doc.pub_id WHERE doc.docid=?`, docid).Scan(&symbol, &language, &issue, &title, &src)
+	// Backup location keys identify the undated publication, unlike JWPUB's dated Symbol.
+	err := library.QueryRowContext(ctx, `SELECT COALESCE(NULLIF(pub.undated_symbol,''),pub.symbol),pub.meps_lang,COALESCE(pub.issue_tag,0),COALESCE(doc.title,''),doc.html FROM doc JOIN pub ON pub.id=doc.pub_id WHERE doc.docid=?`, docid).Scan(&symbol, &language, &issue, &title, &src)
 	if err != nil {
 		return nil, "", fmt.Errorf("document %d in local library: %w", docid, err)
+	}
+	if strings.TrimSpace(symbol) == "" {
+		return nil, "", fmt.Errorf("document %d has no undated publication symbol", docid)
 	}
 	v["KeySymbol"] = symbol
 	v["MepsLanguage"] = language
