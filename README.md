@@ -19,6 +19,80 @@ a passage with its notes, full-text search, whole documents, images and video su
 A static Go binary with JSON output, meant to be driven by scripts. The older `jwlib` name
 stays available as a symlink alias.
 
+## Private JW Library backups
+
+`backup` works locally with schema 16 `.jwlibrary` user-data backups. It validates the
+manifest hash, SQLite integrity, foreign keys and referenced media. No backup data is
+sent to a service. Restoring a backup in JW Library **replaces the device's personal
+study data**: export a fresh backup from every device before restoring anything.
+
+```sh
+pubkit backup inspect first.jwlibrary
+pubkit backup merge first.jwlibrary second.jwlibrary third.jwlibrary \
+  --prefer newest --device-name "Combined library" -o combined.jwlibrary
+pubkit backup merge first.jwlibrary second.jwlibrary --prefer first.jwlibrary \
+  --prefer-notes newest --prefer-input-fields oldest --dry-run
+pubkit backup merge first.jwlibrary second.jwlibrary --interactive \
+  --report merge-report.json -o reviewed.jwlibrary
+```
+
+The first input wins by default. `--prefer` accepts any input path, `newest` or
+`oldest`; dates come from the archive's `lastModifiedDate`, and equal dates retain
+input order. The same choices work for `--prefer-notes`, `--prefer-highlights`,
+`--prefer-input-fields`, `--prefer-tags` and `--prefer-bookmarks`. Tags are identified
+by `(Type, Name)`, so differently named tags coexist. Location keys, GUIDs, all
+references and playlist relationships are remapped. Identical playlist content and
+relationships are deduplicated across inputs; different items remain separate.
+Preferred tag membership positions are retained; additional memberships append in order.
+Colliding media filenames are renamed and references follow the new path.
+
+Different-device highlight overlaps are reported. The preferred range keeps its
+color and only uncovered numeric tokens are imported. Token boundaries are
+inclusive. If a whole-block range has unknown bounds, the overlapping preferred
+range wins for that block and the loss is reported. Existing overlaps within one
+input are preserved. `--dry-run` performs the merge and validation in temporary
+storage without writing an output archive. Inputs and existing outputs are never
+overwritten. The JSON report lists counts, identifiers, differing fields and
+overlaps, without note bodies or answer values; treat its identifiers as private.
+
+`--interactive` requires a terminal and reviews conflicting note titles/bodies and
+textarea answers one by one. It shows both versions and a word diff, with choices
+to keep A or B, concatenate with a separator, edit with `$EDITOR`, or skip the
+decision and retain `--prefer`. Metadata-only conflicts use the configured strategy.
+The editor receives a temporary private file, deleted afterwards. For unattended
+merges, use `--prefer`; requesting interaction without a TTY fails clearly.
+
+`backup annotate` is an experimental prototype for publication paragraphs and
+workbook textareas, using decrypted HTML already indexed in the local library:
+
+```sh
+pubkit backup annotate first.jwlibrary --language E --plan annotations.json \
+  --device-name "Annotation experiment" -o experiment.jwlibrary
+```
+
+An invented plan illustrates the format; replace its document id, paragraph id and
+quote with values from your own library:
+
+```json
+{
+  "highlights": [{"docid": 123456, "pid": 4, "quote": "purple robots", "color": 1}],
+  "note": {"highlight": 0, "title": "Invented observation", "content": "The robots are imaginary."},
+  "answers": [{"docid": 123456, "text_tag": "tt11", "value": "An invented answer."}]
+}
+```
+
+The note's `highlight` is a zero-based index into the plan. Colors range from 1 to
+6. Paragraph `pid` comes from HTML `data-pid`, which differs from the printed
+paragraph number. Answers require an actual `textarea` id, not just any `tt<n>`
+element. Existing highlights and answers are never replaced. Tokenization is an
+unofficial reconstruction that counts Unicode words and punctuation; inspect the
+result visually in JW Library before relying on it. Bible verse annotation and
+exact tokenizer parity across languages and publication editions remain unverified.
+
+Spanish aliases are `respaldo`, `inspeccionar`, `unir` and `anotar`. Compatible flag
+aliases include `--salida`, `--preferir`, `--simular`, `--interactivo` and
+`--nombre-dispositivo`.
+
 ## Installation
 
 Download a platform archive from [Releases](https://github.com/jjuanrivvera/jwpubkit/releases),
