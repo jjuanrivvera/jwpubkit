@@ -64,23 +64,27 @@ func Execute() int {
 // legacyFlags maps the Spanish flag names this CLI shipped with to their current
 // names, so a script written against an older version keeps working.
 var legacyFlags = map[string]string{
-	"biblioteca":  "library",
-	"idioma":      "language",
-	"silencioso":  "quiet",
-	"sin-red":     "offline",
-	"archivo":     "file",
-	"biblia":      "bible",
-	"citas":       "citations",
-	"extractos":   "extracts",
-	"formato":     "format",
-	"forzar":      "force",
-	"limite":      "limit",
-	"listar":      "list",
-	"salida":      "output",
-	"sin-atalaya": "no-watchtower",
-	"sin-citas":   "no-citations",
-	"sin-notas":   "no-notes",
-	"tiempos":     "timings",
+	"biblioteca":         "library",
+	"idioma":             "language",
+	"silencioso":         "quiet",
+	"sin-red":            "offline",
+	"archivo":            "file",
+	"biblia":             "bible",
+	"citas":              "citations",
+	"extractos":          "extracts",
+	"formato":            "format",
+	"forzar":             "force",
+	"limite":             "limit",
+	"listar":             "list",
+	"salida":             "output",
+	"preferir":           "prefer",
+	"interactivo":        "interactive", //nolint:misspell // Spanish compatibility alias.
+	"simular":            "dry-run",
+	"nombre-dispositivo": "device-name",
+	"sin-atalaya":        "no-watchtower",
+	"sin-citas":          "no-citations",
+	"sin-notas":          "no-notes",
+	"tiempos":            "timings",
 }
 
 func normalizeFlag(_ *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -124,7 +128,7 @@ Library: ~/.local/share/jwlib (change it with --library, JWPUBKIT_HOME or JWLIB_
 	pf.BoolVar(&a.offline, "offline", false, "stay off the network (no sync, no CDN lookups)")
 	pf.StringVar(&a.lang, "language", a.settle("language", defaultLang, a.cfg.Language, "JWPUBKIT_LANG"), "publication language (jw.org symbol: E english, S spanish, F french…)")
 	pf.BoolVarP(&a.quiet, "quiet", "q", false, "do not print progress on stderr")
-	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.readingTimeCmd(), a.chainCmd(), a.graphCmd(), a.completionCmd(), a.versionCmd(), a.dailyCmd(), a.watchtowerCmd(), a.placesCmd(), a.updateWeekCmd(), a.catalogCmd(), a.mediaCmd())
+	root.AddCommand(a.syncCmd(), a.weekCmd(), a.verseCmd(), a.searchCmd(), a.docCmd(), a.imageCmd(), a.subtitlesCmd(), a.pubsCmd(), a.dossierCmd(), a.configCmd(), a.dropCmd(), a.readingTimeCmd(), a.chainCmd(), a.graphCmd(), a.completionCmd(), a.versionCmd(), a.dailyCmd(), a.watchtowerCmd(), a.placesCmd(), a.updateWeekCmd(), a.catalogCmd(), a.mediaCmd(), a.backupCmd())
 	return root
 }
 
