@@ -14,6 +14,7 @@
 - `backup annotate` adds highlights, notes and text-field answers anchored with undated publication keys.
 - Exercise every merge path with invented schema-16 databases; no real backups in the repository. Raise the coverage
   floor to 70% (measured total about 72%).
+- Build with Go 1.26.9 and golang.org/x/net v0.60.0, fixing GO-2026-6617 in net/http.
 
 ## v0.11.0 - 2026-09-30
 
