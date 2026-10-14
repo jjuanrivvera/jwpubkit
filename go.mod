@@ -6,9 +6,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.9
-	golang.org/x/net v0.60.0
-	golang.org/x/sys v0.48.0
+	github.com/spf13/pflag v1.0.10
+	golang.org/x/net v0.61.0
+	golang.org/x/sys v0.49.0
 	modernc.org/sqlite v1.60.1
 )
 
