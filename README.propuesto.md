@@ -1,10 +1,17 @@
+<div align="center">
+
 # pubkit
+
+**A local-first command-line toolkit for working with JWPUB libraries.**
 
 [![CI](https://github.com/jjuanrivvera/jwpubkit/actions/workflows/ci.yml/badge.svg)](https://github.com/jjuanrivvera/jwpubkit/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/jjuanrivvera/jwpubkit)](https://github.com/jjuanrivvera/jwpubkit/releases)
+[![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ![pubkit in action](assets/demo.gif)
+
+</div>
 
 `pubkit` is a command-line tool that downloads publications in JWPUB format from the open
 jw.org CDN, decrypts them and indexes them into a local SQLite database. You then query that
@@ -119,6 +126,34 @@ Library queries work offline; `sync`, `catalog`, `update-week`, subtitle retriev
 The remaining commands (`catalog`, `media clip`, `media frame`, `places`, `update-week`, `drop`,
 `completion`, `backup`) are covered in the [command reference](docs/reference.md) and in
 `pubkit <command> --help`.
+
+## Use with AI agents
+
+`skills/pubkit/SKILL.md` is an Agent Skill: a short instruction file
+that teaches a coding agent when to reach for `pubkit`, which commands to run, how to read the
+`--json` output, and what not to do (no recalling publication text from memory, no downloads
+without asking, no republishing). It needs `pubkit` installed on the same machine.
+
+For Claude Code, copy it into your skills folder:
+
+```sh
+mkdir -p ~/.claude/skills && cp -r skills/pubkit ~/.claude/skills/
+```
+
+For Codex and other agents that read `~/.agents/skills`:
+
+```sh
+mkdir -p ~/.agents/skills && cp -r skills/pubkit ~/.agents/skills/
+```
+
+Or let the [`skills`](https://www.npmjs.com/package/skills) installer do it:
+
+```sh
+npx skills add jjuanrivvera/jwpubkit -g -a claude-code    # or -a codex
+```
+
+The agent then uses the skill whenever you ask about the week's meeting, a passage, a search or
+a video transcript.
 
 ## Configuration
 
