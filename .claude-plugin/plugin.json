@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "pubkit",
+  "version": "0.1.0",
+  "description": "Query a local library of JW publications (JWPUB) offline: the week's meeting, Bible passages with notes and cross references, full-text search, documents, images and video subtitles.",
+  "author": { "name": "Juan Rivera", "url": "https://github.com/jjuanrivvera" },
+  "homepage": "https://github.com/jjuanrivvera/jwpubkit",
+  "repository": "https://github.com/jjuanrivvera/jwpubkit",
+  "license": "MIT",
+  "skills": "./skills",
+  "keywords": ["jwpub", "jw-library", "bible", "cli", "ai-agent", "sqlite"]
+}

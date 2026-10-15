@@ -1,0 +1,275 @@
+# Command reference
+
+The full per-command notes, moved out of the README unchanged. Run `pubkit <command> --help` for flags.
+
+
+The examples use the publication symbols and references you would actually type. Library queries work offline. Synchronization, catalog refresh and remote clips need the network.
+
+## `sync`
+
+Fetch and index a publication, or import a file you already have:
+
+```sh
+pubkit sync mwb --issue 202609
+pubkit sync nwtsty it wcg
+pubkit sync nwtsty it --plan --json
+pubkit sync scl ijwbv --interval 2s --budget-bytes 50000000 --json
+pubkit sync --file ~/Downloads/mwb_E_202609.jwpub mwb --issue 202609
+```
+
+`--plan` reads CDN metadata and verifies existing archive checksums without creating or changing
+the library. The disk estimate is three archive sizes for a new download, not a guarantee.
+`--budget-bytes` limits planned publication download bytes and reports pending symbols.
+
+## `catalog`
+
+```sh
+pubkit catalog publications w --year 2026 --format JWPUB --interval 2s --json
+pubkit catalog publications wcgr --format PDF --json
+pubkit catalog media --language S --refresh --interval 2s
+```
+
+The media catalog traverses every category reachable from the mediator root, not just the
+`AllVideos` category. Items are deduplicated by language-agnostic key and retain category
+provenance, publication date, duration, renditions, sizes, checksums and subtitle URLs.
+Metadata is cached under `<library>/catalog/media.<language>.json`; `--file` imports the same
+JSON schema from a prior download. `--refresh --resume` reuses saved category responses
+from an interrupted crawl; omit `--resume` for a fresh traversal. Discovery, transcript indexing and absence of VTT are
+separate database states. Publication catalogs probe the specified symbol and issue or year;
+historical Watchtower years include half-month issues. Empty issues are omitted, and
+formats without JWPUB remain visible. No publication files are downloaded by this command.
+
+## `week`
+
+The week's meeting, assembled from what is indexed:
+
+```sh
+pubkit week 2026-01-05 --json
+```
+
+## `verse`
+
+A passage with its footnotes and cross references:
+
+```sh
+pubkit verse "John 3:16" --citations 40 --json
+```
+
+## `search`
+
+Full-text search across the library. Every hit carries the citation in the form publications
+use for themselves, and a link that opens that paragraph in your language:
+
+```sh
+pubkit search "cistern" --pub it,w --limit 5
+```
+
+## `doc`
+
+Render a document by its id:
+
+```sh
+pubkit doc 1102025901 --format json
+```
+
+## `image`
+
+List or extract the media attached to a document:
+
+```sh
+pubkit image 1102025901 --list
+pubkit image 1001070215 --offline --list --json
+pubkit image 1102025901 --paragraph 3 --media-store
+pubkit image 1102025901 --passage "Gen 1:1" --list --json
+```
+
+Images come from document markup and the multimedia table, including SVG figures. Each
+result carries its document, publication and paragraph provenance. `--paragraph` uses the
+publication's paragraph numbers; `--passage` selects figures spanning paragraphs that cite
+that passage. Use either selector, or `--figure <filename>` and `--genre svg|photo`.
+`--list` does not reach the CDN or write images. Local SVG image dependencies are embedded
+when exporting; unavailable or external dependencies are reported on stderr.
+
+## `subtitles`
+
+Transcribe a video from its subtitles, and find a phrase in the transcripts you have:
+
+```sh
+pubkit subtitles pub-jwbai_201507_1_VIDEO --format vtt
+pubkit subtitles find "a phrase" --limit 5
+pubkit subtitles sync --catalog --no-video --resume --interval 2s --budget-bytes 100000000 --json
+pubkit subtitles find "a phrase" --scope catalog --context 15s --json
+```
+
+`find` reports the video, the exact second the phrase is said, and a link that opens it
+there. It searches only transcripts already fetched; fetching one adds it to the set.
+`--scope catalog` searches windows of three adjacent cues from discovered media, so phrases
+split across cues can match. `--context` returns surrounding cues, and hits include category,
+publication date and transcript state. The first catalog search backfills the window index.
+
+`subtitles sync` requires `--catalog --no-video`: it never downloads an MP4. Cached VTT files
+are checked against advertised checksums and indexed per key, making interruption resumable.
+The byte budget counts subtitle response bodies read in that run; metadata and transport
+headers are excluded. Failed downloads remain recorded and make the command exit nonzero.
+`--pub-media-fallback` optionally probes items lacking a mediator VTT through pub-media;
+this adds requests and is disabled by default. Files without official subtitles are listed
+as `no_vtt`, not silently treated as searchable.
+
+## `media clip`
+
+```sh
+pubkit media clip pub-jwbvod26_16_VIDEO --from 08:12 --to 08:32 \
+  --resolution 240p --mode exact --traffic-bytes 30000000 \
+  --output-bytes 10000000 --output /tmp/fragment.mp4 --json
+```
+
+Requires `ffmpeg` and `ffprobe` on PATH. A loopback proxy forwards only single byte-range
+requests and cancels ffmpeg if the origin ignores or misstates a range, or the response-body
+traffic budget is exhausted. Traffic and output budgets are independent. An existing output
+is never overwritten; failed or truncated output is discarded. Results report requested
+start/end, effective duration and measured bytes. `copy` keeps the original codecs and can
+start at a keyframe; `exact` reencodes. Output size limiting can shorten a clip, in which case
+the command fails instead of publishing it. Audio frame rounding can slightly extend duration.
+
+Use `--no-audio` for a silent MP4, or `--audio-only --output fragment.m4a` for
+an audio-only M4A. These flags are mutually exclusive. `copy` requires an audio codec
+supported by M4A; use `--mode exact` to encode AAC. An absent requested track is an error.
+
+## `media frame`
+
+```sh
+pubkit media frame pub-jwbvod26_16_VIDEO --at 08:12 --resolution 240p --output frame.jpg
+pubkit media frame pub-jwbvod26_16_VIDEO --at 08:12 --at 08:18 \
+  --format png --output frames --contact-sheet contact.png --json
+pubkit media frame pub-jwbvod26_16_VIDEO --every 5 --from 08:12 --to 08:32 \
+  --output frames --contact-sheet contact.jpg --columns 3
+```
+
+Requires `ffmpeg`. Times accept seconds, `mm:ss` or `hh:mm:ss`, with fractional seconds.
+Repeat `--at`, or use a positive `--every` interval with both bounds; `--to` is inclusive
+when it lies on the interval, and every mark must be before the video end. A batch is
+limited to 100 marks. `--format jpg` is the default; PNG is also supported. For one mark,
+`--output` is a new image path with the matching extension; for multiple marks it is a
+directory. Without it, names are derived from the key and requested milliseconds.
+
+The optional contact sheet fits thumbnails in a grid and labels them with requested
+hours, minutes, seconds and milliseconds. Original images are kept. JSON reports each
+requested time, dimensions and path, plus aggregate output and received bytes. A frame
+is the first decoded video frame at or after the requested time, subject to frame-rate
+rounding. Batches stage and decode all images before publishing them and preserve
+existing output paths; a failed publication rolls back images created by that batch.
+
+Only bounded 256 KiB byte ranges reach the origin. An in-memory cache shares MP4 index
+and video blocks between marks, and `--interval 1s` pauses between uncached requests.
+Traffic includes downloaded blocks, including partial or discarded reads; it excludes
+HTTP headers. `--traffic-bytes` defaults to 30 MB across the entire batch, and
+`--output-bytes` to 20 MB including the sheet. There is no full-file download fallback.
+Seeking still needs the MP4 index and a preceding keyframe; bytes depend on file layout,
+resolution and keyframe spacing. Nearby marks normally reuse cached blocks.
+
+## `reading-time`
+
+How long something takes to read aloud — a document, a passage, or text piped in:
+
+```sh
+pubkit reading-time 1102025901
+pubkit reading-time --reference "Jer 38:1-13"
+echo "the text of a talk" | pubkit reading-time
+```
+
+Words are counted where the script separates them and characters where it does not, so the
+estimate holds in Chinese or Thai as well as in Spanish. The rates are assumptions and both
+are overridable (`--wpm`, `--cpm`).
+
+## `pubs`
+
+What the library currently holds:
+
+```sh
+pubkit pubs --json
+```
+
+## `daily`, `watchtower`, `places`, `update-week`
+
+```sh
+pubkit daily                      # the daily text, from the yearly volume
+pubkit watchtower 2026-09-28      # the study article, paragraph by paragraph with its question
+pubkit places "Jer 38:6-39:2"            # range evidence with classification and provenance
+pubkit update-week --with-references --interval 2s
+pubkit update-week --dry-run      # what the week needs, without touching the network
+```
+
+`places` reports what each row is and where it came from. It does not say a place is located on
+a map, because no such link exists in the data; see ../DECISIONS.md. Classification distinguishes
+maps, general appendix figures, publication-title candidates and unclassified encyclopedia
+terms. It does not infer geography from capitalized words. `--kind` filters classification;
+`--figure` selects an exact figure filename. `update-week --with-references` resolves missing
+publications named by the workbook's extracts; historical public editions from 2008–2015
+use the `wp` API symbol even when their reference metadata uses `w`. Unresolved metadata
+and failures are reported.
+
+## `graph`
+
+Walk the connections the publications already state, from a passage or a document — who quotes
+it, what its margin points at, what is quoted alongside it, which videos the citing articles
+embed, which terms its notes define:
+
+```sh
+pubkit graph "Jer 38:6"
+pubkit graph 1102025901 --json
+pubkit graph "Ps 23:1" --only cited-alongside --per-relation 40
+```
+
+Every edge names the table it came from, so an answer can be checked. Nothing is inferred.
+
+## `chain`
+
+Follow the marginal references out of a passage, as far as you ask, with each verse's text:
+
+```sh
+pubkit chain "Jer 38:6" --hops 2
+```
+
+The walk is breadth-first and visits a verse once, so each one is reported at the fewest
+references it is reachable by — and so the walk finishes, which a naive one does not: the
+references point both ways.
+
+## `dossier`
+
+Everything around a passage — verses, notes, references and the articles that cite it — in one
+document meant to be read once:
+
+```sh
+pubkit dossier "Jer 38:1-13" --json
+```
+
+## `drop`
+
+Remove one language's indexed library. It reports first and removes nothing without `--yes`,
+and it takes the database's `-wal` and `-shm` with it, which is the part that is easy to get
+wrong by hand:
+
+```sh
+pubkit drop --language E
+pubkit drop --language E --cache --yes
+```
+
+## `config`
+
+Every setting in effect and what decided it:
+
+```sh
+pubkit config
+```
+
+## `completion` and `version`
+
+```sh
+pubkit completion zsh > _pubkit
+pubkit version
+```
+
+Most commands take `--json`. Run `pubkit <command> --help` for the full flags.
+
+The spanish command and flag names this tool shipped with (`semana`, `versiculo`, `buscar`,
+`imagen`, `subtitulos`, `expediente`, `--biblioteca`, `--limite`…) still work as aliases.
