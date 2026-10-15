@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "jwpubkit",
+  "owner": { "name": "Juan Rivera", "url": "https://github.com/jjuanrivvera" },
+  "plugins": [
+    {
+      "name": "pubkit",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "Query a local library of JW publications (JWPUB) offline with the pubkit CLI.",
+      "homepage": "https://github.com/jjuanrivvera/jwpubkit",
+      "keywords": ["jwpub", "jw-library", "bible", "cli", "ai-agent", "sqlite"]
+    }
+  ]
+}

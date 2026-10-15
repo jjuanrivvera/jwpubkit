@@ -129,27 +129,23 @@ The remaining commands (`catalog`, `media clip`, `media frame`, `places`, `updat
 
 ## Use with AI agents
 
-`skills/pubkit/SKILL.md` is an Agent Skill: a short instruction file
-that teaches a coding agent when to reach for `pubkit`, which commands to run, how to read the
-`--json` output, and what not to do (no recalling publication text from memory, no downloads
-without asking, no republishing). It needs `pubkit` installed on the same machine.
+This repository is also a Claude Code plugin marketplace. It ships one plugin, `pubkit`, whose
+skill (`skills/pubkit/SKILL.md`, with deeper notes in `skills/pubkit/references/`) teaches a coding
+agent when to reach for `pubkit`, which commands to run, how to read the `--json` output, and
+what not to do: no recalling publication text from memory, no downloads without asking, no
+republishing. The skill needs `pubkit` installed on the same machine.
 
-For Claude Code, copy it into your skills folder:
+In Claude Code:
 
-```sh
-mkdir -p ~/.claude/skills && cp -r skills/pubkit ~/.claude/skills/
+```text
+/plugin marketplace add jjuanrivvera/jwpubkit
+/plugin install pubkit@jwpubkit
 ```
 
-For Codex and other agents that read `~/.agents/skills`:
+For Codex and other agents that read `~/.agents/skills`, copy the skill folder:
 
 ```sh
 mkdir -p ~/.agents/skills && cp -r skills/pubkit ~/.agents/skills/
-```
-
-Or let the [`skills`](https://www.npmjs.com/package/skills) installer do it:
-
-```sh
-npx skills add jjuanrivvera/jwpubkit -g -a claude-code    # or -a codex
 ```
 
 The agent then uses the skill whenever you ask about the week's meeting, a passage, a search or
